@@ -17,7 +17,6 @@ import numpy as np
 from .src.birdman_chunked import run_birdman_chunk
 from .src._utils import validate_table_and_metadata, validate_formula
 from .src._summarize import summarize_inferences
-from .src._log import setup_loggers
 
 def _create_dir(output_dir):
   sub_dirs = ["slurm_out", "logs", "inferences", "results", "plots"]
@@ -54,13 +53,8 @@ def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16,
     chunks = 20
     output_dir = os.path.join(os.getcwd(), "test_out") 
     _create_dir(output_dir)
-    
-    # Set up logger
-    logfile = os.path.join(output_dir, "logs", "birdman.log")
+    print(f"Output directory is {output_dir}")
     os.makedirs(os.path.join(output_dir, "logs"), exist_ok=True)
-    birdman_logger = setup_loggers(logfile)
-    
-    birdman_logger.info(f"Output directory is {output_dir}")
 
     def run_chunk(chunk_num):
         log_path = os.path.join(output_dir, "logs", f"chunk_{chunk_num}.log")
@@ -80,17 +74,10 @@ def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16,
         delayed(run_chunk)(i) for i in range(1, chunks + 1)
     )
 
-    birdman_logger.info(f"DEBUG: Summarizing inferences from {output_dir}")
-    summarized_results = summarize_inferences(output_dir, logfile=logfile)
-    birdman_logger.info(f"DEBUG: Summarized results shape: {summarized_results.shape if summarized_results is not None else 'None'}")
-    
-    if summarized_results is None or summarized_results.empty:
-        birdman_logger.warning(f"DEBUG: No results to summarize")
-        return None
-        
+    summarized_results = summarize_inferences(output_dir)
     summarized_results.index.name = 'featureid'
     results_metadata = Metadata(summarized_results)
 
-    birdman_logger.info(f"Results are stored in: {output_dir}")
+    print(f"Results are stored in: {output_dir}")
 
     return results_metadata
