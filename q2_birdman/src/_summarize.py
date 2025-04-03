@@ -6,6 +6,7 @@ from pathlib import Path
 from multiprocessing.pool import ThreadPool
 #from src._utils import _create_folder_without_clear
 from ._utils import _create_folder_without_clear
+from .logger import setup_loggers
 
 
 def _process_dataframe(df, feat_id, suffix=""):
@@ -17,28 +18,28 @@ def _process_dataframe(df, feat_id, suffix=""):
     return df
 
 
-def _reformat_multiindex(df, feat_id, suffix=""):
+def _reformat_multiindex(df, feat_id, suffix="", logger=None):
     df = df.copy().reset_index()
     new_df = pd.DataFrame(columns=df.covariate.unique(), index=[feat_id])
     for c in new_df.columns:
-        print(f"DEBUG: Processing covariate {c} for feature {feat_id}")
-        print(f"DEBUG: DataFrame shape: {df.shape}, columns: {df.columns.tolist()}")
-        print(f"DEBUG: Filtering for covariate {c} and hdi='lower'")
+        logger.info(f"DEBUG: Processing covariate {c} for feature {feat_id}")
+        logger.info(f"DEBUG: DataFrame shape: {df.shape}, columns: {df.columns.tolist()}")
+        logger.info(f"DEBUG: Filtering for covariate {c} and hdi='lower'")
         lower_df = df.loc[(df["covariate"] == c) & (df["hdi"] == "lower")]
-        print(f"DEBUG: Lower dataframe shape: {lower_df.shape}")
+        logger.info(f"DEBUG: Lower dataframe shape: {lower_df.shape}")
         if lower_df.empty:
-            print(f"DEBUG: No lower values found for covariate {c}")
+            logger.info(f"DEBUG: No lower values found for covariate {c}")
             continue
-        print(f"DEBUG: Accessing 'beta_var' column from lower dataframe")
+        logger.info(f"DEBUG: Accessing 'beta_var' column from lower dataframe")
         lower = lower_df["beta_var"].values[0]
         
-        print(f"DEBUG: Filtering for covariate {c} and hdi='higher'")
+        logger.info(f"DEBUG: Filtering for covariate {c} and hdi='higher'")
         higher_df = df.loc[(df["covariate"] == c) & (df["hdi"] == "higher")]
-        print(f"DEBUG: Higher dataframe shape: {higher_df.shape}")
+        logger.info(f"DEBUG: Higher dataframe shape: {higher_df.shape}")
         if higher_df.empty:
-            print(f"DEBUG: No higher values found for covariate {c}")
+            logger.info(f"DEBUG: No higher values found for covariate {c}")
             continue
-        print(f"DEBUG: Accessing 'beta_var' column from higher dataframe")
+        logger.info(f"DEBUG: Accessing 'beta_var' column from higher dataframe")
         higher = higher_df["beta_var"].values[0]
         
         new_df[c][feat_id] = (lower, higher)
@@ -61,68 +62,72 @@ def convert_types(df):
             df[col] = df[col].astype(str)
     return df
 
-def summarize_inferences_single_file(inf_file):
+def summarize_inferences_single_file(inf_file, logger=None):
     FEAT_REGEX = re.compile("F\d{4}_(.*).nc")
     try:
-        print(f"DEBUG: Processing file: {inf_file}")
+        logger.info(f"DEBUG: Processing file: {inf_file}")
         match = FEAT_REGEX.search(inf_file)
         if match is None:
-            print(f"DEBUG: Regex pattern did not match filename: {inf_file}")
+            logger.info(f"DEBUG: Regex pattern did not match filename: {inf_file}")
             return None
-        print(f"DEBUG: Regex match groups: {match.groups()}")
+        logger.info(f"DEBUG: Regex match groups: {match.groups()}")
         this_feat_id = match.groups()[0]
-        print(f"DEBUG: Extracted feature ID: {this_feat_id}")
+        logger.info(f"DEBUG: Extracted feature ID: {this_feat_id}")
         
-        print(f"DEBUG: Loading inference data from {inf_file}")
+        logger.info(f"DEBUG: Loading inference data from {inf_file}")
         this_feat_diff = az.from_netcdf(inf_file).posterior["beta_var"]
-        print(f"DEBUG: Inference data shape: {this_feat_diff.shape}")
+        logger.info(f"DEBUG: Inference data shape: {this_feat_diff.shape}")
         
-        print(f"DEBUG: Calculating mean")
+        logger.info(f"DEBUG: Calculating mean")
         this_feat_diff_mean = this_feat_diff.mean(["chain", "draw"]).to_dataframe().T
-        print(f"DEBUG: Mean dataframe shape: {this_feat_diff_mean.shape}")
+        logger.info(f"DEBUG: Mean dataframe shape: {this_feat_diff_mean.shape}")
         
-        print(f"DEBUG: Calculating std")
+        logger.info(f"DEBUG: Calculating std")
         this_feat_diff_std = this_feat_diff.std(["chain", "draw"]).to_dataframe().T
-        print(f"DEBUG: Std dataframe shape: {this_feat_diff_std.shape}")
+        logger.info(f"DEBUG: Std dataframe shape: {this_feat_diff_std.shape}")
         
-        print(f"DEBUG: Calculating HDI")
+        logger.info(f"DEBUG: Calculating HDI")
         this_feat_diff_hdi = az.hdi(this_feat_diff).to_dataframe()
-        print(f"DEBUG: HDI dataframe shape: {this_feat_diff_hdi.shape}")
+        logger.info(f"DEBUG: HDI dataframe shape: {this_feat_diff_hdi.shape}")
         
-        print(f"DEBUG: Processing mean dataframe")
+        logger.info(f"DEBUG: Processing mean dataframe")
         this_feat_diff_mean = _process_dataframe(
             this_feat_diff_mean, this_feat_id, suffix="_mean"
         )
         
-        print(f"DEBUG: Processing std dataframe")
+        logger.info(f"DEBUG: Processing std dataframe")
         this_feat_diff_std = _process_dataframe(
             this_feat_diff_std, this_feat_id, suffix="_std"
         )
         
-        print(f"DEBUG: Reformatting multiindex")
+        logger.info(f"DEBUG: Reformatting multiindex")
         this_feat_diff_hdis = _reformat_multiindex(
-            this_feat_diff_hdi, this_feat_id, suffix="_hdi"
+            this_feat_diff_hdi, this_feat_id, suffix="_hdi", logger=logger
         )
         
-        print(f"DEBUG: Concatenating dataframes")
+        logger.info(f"DEBUG: Concatenating dataframes")
         result = pd.concat(
             [this_feat_diff_mean, this_feat_diff_std, this_feat_diff_hdis], axis=1
         )
-        print(f"DEBUG: Final result shape: {result.shape}")
+        logger.info(f"DEBUG: Final result shape: {result.shape}")
         return result
     except Exception as e:
-        print(f"Error processing file {inf_file}: {str(e)}")
+        logger.error(f"Error processing file {inf_file}: {str(e)}")
         import traceback
-        print(f"DEBUG: Traceback: {traceback.format_exc()}")
+        logger.error(f"DEBUG: Traceback: {traceback.format_exc()}")
         return None
 
 
-def summarize_inferences(input_dir, threads=1):
+def summarize_inferences(input_dir, threads=1, logfile=None):
     #_create_folder_without_clear(output_dir)
+    logger = setup_loggers(logfile) if logfile else None
+    
     all_inf_files = glob(f"{input_dir}/inferences/*.nc")
+    logger.info(f"DEBUG: Found {len(all_inf_files)} inference files")
 
-    results = _parallel(threads, summarize_inferences_single_file, all_inf_files)
+    results = _parallel(threads, lambda x: summarize_inferences_single_file(x, logger), all_inf_files)
     feat_diff_df_list = [df for df in results if df is not None]
+    logger.info(f"DEBUG: Processed {len(feat_diff_df_list)} inference files successfully")
 
     if feat_diff_df_list:
         all_feat_diffs_df = pd.concat(feat_diff_df_list, axis=0)
@@ -132,4 +137,5 @@ def summarize_inferences(input_dir, threads=1):
         )
         return convert_types(all_feat_diffs_df)
     else:
-        print("No available feat_diff_dfs...")  # TODO: chaneg this to log
+        logger.warning("No available feat_diff_dfs...")  # TODO: chaneg this to log
+        return None

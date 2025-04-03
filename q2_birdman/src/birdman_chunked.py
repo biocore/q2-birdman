@@ -74,13 +74,13 @@ def run_birdman_chunk(
     birdman_logger.info(f"Processing chunk number: {chunk_num}")
 
     for feature_id, model in chunk:
-        print(f"DEBUG: Processing feature_id: {feature_id}")
-        print(f"DEBUG: FIDS shape: {len(FIDS)}")
-        print(f"DEBUG: Looking for feature_id in FIDS")
+        birdman_logger.info(f"DEBUG: Processing feature_id: {feature_id}")
+        birdman_logger.info(f"DEBUG: FIDS shape: {len(FIDS)}")
+        birdman_logger.info(f"DEBUG: Looking for feature_id in FIDS")
         feature_indices = np.where(FIDS == feature_id)[0]
-        print(f"DEBUG: Found indices: {feature_indices}")
+        birdman_logger.info(f"DEBUG: Found indices: {feature_indices}")
         if len(feature_indices) == 0:
-            print(f"DEBUG: Feature ID {feature_id} not found in FIDS")
+            birdman_logger.warning(f"DEBUG: Feature ID {feature_id} not found in FIDS")
             continue
         feature_num = feature_indices[0]
         feature_num_str = str(feature_num).zfill(4)
