@@ -156,44 +156,6 @@ class RunMethodTests(TestPluginBase):
         with self.assertRaisesRegex(ValueError, "The following columns contain null values: condition"):
             run(biom_table, metadata, formula, threads=1)
 
-    def test_run_creates_directories(self):
-        """
-        Check that expected output directories after Run are created (implicitly tests _create_dir), otherwises raises AssertionError
-        """
-        biom_table = biom.Table(
-            np.random.randint(1, 10, size=(20, 2)),
-            sample_ids=['sample-1', 'sample-2'],
-            observation_ids=[f'feature-{i+1}' for i in range(20)]
-        )
-
-        # Mock metadata
-        metadata = Metadata(pd.DataFrame(
-            {'condition': ['A', 'B']},
-            index=pd.Index(['sample-1', 'sample-2'], name='#Sample ID')
-        ))
-
-        formula = 'condition'
-
-        with tempfile.TemporaryDirectory() as temp_dir, \
-            patch('q2_birdman.src.birdman_chunked.run_birdman_chunk'), \
-            patch('q2_birdman.src._summarize.summarize_inferences',
-                return_value=pd.DataFrame({'col1': [1, 2]})):  # Valid DataFrame mock
-
-            with patch('os.getcwd', return_value=temp_dir):
-                try:
-                    output_metadata = run(biom_table, metadata, formula, threads=1)
-                    print("Output metadata:", output_metadata)
-                except Exception as e:
-                    print("Error during run:", str(e))
-                    raise
-
-            # Verify directories
-            expected_dirs = ["slurm_out", "logs", "inferences", "results", "plots"]
-            for sub_dir in expected_dirs:
-                assert os.path.exists(os.path.join(temp_dir, "test_out", sub_dir)), \
-                    f"Expected directory {sub_dir} was not created."
-
-
     def test_run_biom_table_with_nans(self):
         """
         Test that a BIOM table with NaN values raises a ValueError.

@@ -11,6 +11,7 @@ from q2_types.feature_table import FeatureTable, Frequency
 from q2_types.metadata import ImmutableMetadata
 from q2_birdman import __version__
 from q2_birdman._methods import run
+from q2_birdman._visualizers import plot
 
 citations = Citations.load("citations.bib", package="q2_birdman")
 
@@ -58,6 +59,27 @@ plugin.methods.register_function(
     name='Run BIRDMAn',
     description=('Run BIRDMAn on a feature table with a given model formula. '
                 'Supports both standard and longitudinal analyses using Negative Binomial models.'),
+    citations=[]
+)
+
+plugin.visualizers.register_function(
+    function=plot,
+    inputs={
+        'results_artifact': ImmutableMetadata,
+        'plot_var': Str,
+    },
+    parameters={
+        'flip': Bool
+    },
+    input_descriptions={
+        'results_artifact': 'QIIME2 artifact containing BIRDMAn results',
+        'plot_var': 'Variable to plot (e.g. "host_age")'
+    },
+    parameter_descriptions={
+        'flip': 'Whether to flip the plot orientation [default: False]'
+    },
+    name='Plot BIRDMAn Results',
+    description='Create plots for BIRDMAn analysis results, showing the top features associated with a given variable.',
     citations=[]
 )
 

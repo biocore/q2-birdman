@@ -31,6 +31,7 @@ setup(
     package_data={
         "q2_birdman": ["citations.bib"],
         "q2_birdman.tests": ["data/*"],
+        "q2_birdman.src": ["stan/*.stan"],
     },
     zip_safe=False,
 )

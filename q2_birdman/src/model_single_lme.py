@@ -4,7 +4,7 @@ from birdman import SingleFeatureModel
 import numpy as np
 import pandas as pd
 
-MODEL_PATH = "q2_birdman/src/stan/negative_binomial_lme_single.stan"
+MODEL_PATH = resource_filename("q2_birdman.src", "stan/negative_binomial_lme_single.stan")
 
 class ModelSingleLME(SingleFeatureModel):
     def __init__(
