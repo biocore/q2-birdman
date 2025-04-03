@@ -90,17 +90,37 @@ def run_birdman_chunk(
         tmpdir = f"{inference_dir}/tmp/F{feature_num_str}_{feature_id}"
         infdir = f"{inference_dir}/inferences/"
         outfile = f"{inference_dir}/inferences/F{feature_num_str}_{feature_id}.nc"
-
+        
+        birdman_logger.info(f"DEBUG: Creating directories: {tmpdir}, {infdir}")
         os.makedirs(infdir, exist_ok=True)
         os.makedirs(tmpdir, exist_ok=True)
+        
+        birdman_logger.info(f"DEBUG: About to process model for feature {feature_id}")
+        birdman_logger.info(f"DEBUG: Model type: {type(model)}")
+        birdman_logger.info(f"DEBUG: Model attributes: {dir(model)}")
+        
+        # Check the feature data
+        try:
+            feature_data = table.data(feature_id, axis="observation")
+            birdman_logger.info(f"DEBUG: Feature data shape: {feature_data.shape}")
+            birdman_logger.info(f"DEBUG: Feature data sum: {feature_data.sum()}")
+            birdman_logger.info(f"DEBUG: Feature data min/max: {feature_data.min()}, {feature_data.max()}")
+        except Exception as e:
+            birdman_logger.error(f"Error accessing feature data for {feature_id}: {e}")
+            continue
 
         with TemporaryDirectory(dir=tmpdir) as t:
             try:
+                birdman_logger.info(f"DEBUG: Compiling model")
                 model.compile_model()
+                birdman_logger.info(f"DEBUG: Fitting model (first pass)")
                 model.fit_model()
+                birdman_logger.info(f"DEBUG: Fitting model (second pass with sampler args)")
                 model.fit_model(sampler_args={"output_dir": t})
             except Exception as e:
                 birdman_logger.error(f"Error processing feature {feature_id}: {e}")
+                import traceback
+                birdman_logger.error(f"DEBUG: Traceback: {traceback.format_exc()}")
                 continue
 
             inf = model.to_inference()
