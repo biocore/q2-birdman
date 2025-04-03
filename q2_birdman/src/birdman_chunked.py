@@ -88,7 +88,6 @@ def run_birdman_chunk(
 
         with TemporaryDirectory(dir=tmpdir) as t:
             try:
-                # Compile and fit the model
                 model.compile_model()
                 model.fit_model()
                 model.fit_model(sampler_args={"output_dir": t})
@@ -96,12 +95,11 @@ def run_birdman_chunk(
                 birdman_logger.error(f"Error processing feature {feature_id}: {e}")
                 continue
 
-            # Extract inference results and log them
             inf = model.to_inference()
             birdman_logger.info(f"Inference results for feature {feature_id}:")
             birdman_logger.info(inf.posterior)
 
-            # Calculate LOO and Rhat diagnostics
+            # report diagnostics
             loo = az.loo(inf, pointwise=True)
             rhat = az.rhat(inf)
             birdman_logger.info("LOO diagnostics:")
@@ -113,7 +111,8 @@ def run_birdman_chunk(
             if any(map(np.isnan, loo.values[:3])):
                 birdman_logger.warning(f"{feature_id} has NaN elpd values")
 
-            # Save inference to NetCDF file
+            # save inference results
             inf.to_netcdf(outfile)
             birdman_logger.info(f"Saved to {outfile}")
             time.sleep(10)
+            

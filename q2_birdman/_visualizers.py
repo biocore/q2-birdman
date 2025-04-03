@@ -11,8 +11,30 @@ import json
 import re
 from pathlib import Path
 
-# Original implementation (commented out for now)
-"""
+_html_template = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIRDMAn Plot</title>
+    <style>
+        body {{
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }}
+        h1 {{
+            color: #2c3e50;
+            text-align: center;
+        }}
+    </style>
+</head>
+<body>
+    <img src="{plot_file}" alt="Plot for {plot_var}">
+</body>
+</html>
+""" 
+
 def _unpack_hdi_and_filter(df, col):
     df[["lower", "upper"]] = df[col].str.split(",", expand=True)
     # remove ( from lower and ) from upper and convert to float
@@ -50,6 +72,20 @@ def _display_top_n_feats(df, n, yvar, xvar, xlab, ylab, title, outdir):
     plt.close()
 
 def plot(output_dir: str, results_artifact: Metadata, plot_var: str, flip: bool = False) -> None:
+    """
+    Create plots for BIRDMAn analysis results.
+    
+    Parameters
+    ----------
+    output_dir : str
+        Directory where visualization outputs will be written
+    results_artifact : Metadata
+        QIIME2 artifact containing BIRDMAn results
+    plot_var : str
+        Variable to plot (e.g. "host_age")
+    flip : bool, optional
+        Whether to flip the plot orientation, by default False
+    """
     # Load the metadata from the artifact
     df = results_artifact.to_dataframe()
     
@@ -76,58 +112,3 @@ def plot(output_dir: str, results_artifact: Metadata, plot_var: str, flip: bool 
             xlab=xlab,
             plot_file=f"{plot_var}_plot.png"
         ))
-"""
-
-# Simplified version based on QIIME2 tutorial
-def plot(
-    output_dir: str,
-    results_artifact: Metadata,
-    plot_var: str,
-    flip: bool = False
-) -> None:
-    """
-    Create plots for BIRDMAn analysis results.
-    
-    Parameters
-    ----------
-    output_dir : str
-        Directory where visualization outputs will be written
-    results_artifact : Metadata
-        QIIME2 artifact containing BIRDMAn results
-    plot_var : str
-        Variable to plot (e.g. "host_age")
-    flip : bool, optional
-        Whether to flip the plot orientation, by default False
-    """
-    # Load the metadata from the artifact
-    df = results_artifact.to_dataframe()
-    
-    # Create a simple HTML file with the plot variable name
-    with open(os.path.join(output_dir, 'index.html'), 'w') as fh:
-        fh.write(f'<h1>Plot for {plot_var}</h1>')
-
-_html_template = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BIRDMAn Plot</title>
-    <style>
-        body {
-            padding: 20px;
-            font-family: Arial, sans-serif;
-        }
-        h1 {
-            color: #2c3e50;
-            text-align: center;
-        }
-    </style>
-</head>
-<body>
-    <h1>BIRDMAn Plot for %s</h1>
-    <p>This is a simplified visualization for BIRDMAn results.</p>
-    <p>Plot variable: %s</p>
-</body>
-</html>
-""" 

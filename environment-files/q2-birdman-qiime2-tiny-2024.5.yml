@@ -1,0 +1,15 @@
+channels:
+- https://packages.qiime2.org/qiime2/2024.5/tiny/released
+- conda-forge
+- bioconda
+dependencies:
+  - qiime2-tiny
+  - pip
+  - conda-forge::biom-format
+  - conda-forge::patsy
+  - conda-forge::xarray
+  - conda-forge::arviz
+  - conda-forge::cmdstanpy
+  - pip:
+    - q2-birdman@git+https://github.com/biocore/q2-birdman.git@main
+    - birdman==0.1.0 

@@ -29,6 +29,23 @@ plugin = Plugin(
     citations=[citations['Caporaso-Bolyen-2024']]
 )
 
+@plugin.register_transformer
+def _1(data: ImmutableMetadata) -> Metadata:
+    """
+    Transform an ImmutableMetadata artifact to a Metadata object.
+    
+    Parameters
+    ----------
+    data : ImmutableMetadata
+        The ImmutableMetadata artifact to transform
+        
+    Returns
+    -------
+    Metadata
+        A Metadata object containing the data from the ImmutableMetadata artifact
+    """
+    return data.view(Metadata)
+
 plugin.methods.register_function(
     function=run,
     inputs={
