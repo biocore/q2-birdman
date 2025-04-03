@@ -1,9 +1,9 @@
 channels:
-- https://packages.qiime2.org/qiime2/2024.5/tiny/released
+- https://packages.qiime2.org/qiime2/2024.10/metagenome/staged
 - conda-forge
 - bioconda
 dependencies:
-  - qiime2-tiny
+  - qiime2-metagenome
   - pip
   - conda-forge::biom-format
   - conda-forge::patsy
