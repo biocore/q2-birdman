@@ -6,6 +6,7 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
+import importlib
 from qiime2.plugin import Citations, Plugin, Str, Int, Visualization, Metadata, Bool
 from q2_types.feature_table import FeatureTable, Frequency
 from q2_types.metadata import ImmutableMetadata
@@ -65,17 +66,17 @@ plugin.methods.register_function(
 plugin.visualizers.register_function(
     function=plot,
     inputs={
-        'results_artifact': ImmutableMetadata,
-        'plot_var': Str,
     },
     parameters={
+        'results_artifact': Metadata,
+        'plot_var': Str,
         'flip': Bool
     },
     input_descriptions={
-        'results_artifact': 'QIIME2 artifact containing BIRDMAn results',
-        'plot_var': 'Variable to plot (e.g. "host_age")'
     },
     parameter_descriptions={
+        'results_artifact': 'QIIME2 artifact containing BIRDMAn results',
+        'plot_var': 'Variable to plot (e.g. "host_age")',
         'flip': 'Whether to flip the plot orientation [default: False]'
     },
     name='Plot BIRDMAn Results',
@@ -83,3 +84,4 @@ plugin.visualizers.register_function(
     citations=[]
 )
 
+importlib.import_module('q2_birdman._transformers')
