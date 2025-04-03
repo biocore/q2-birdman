@@ -74,7 +74,14 @@ def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16,
         delayed(run_chunk)(i) for i in range(1, chunks + 1)
     )
 
+    print(f"DEBUG: Summarizing inferences from {output_dir}")
     summarized_results = summarize_inferences(output_dir)
+    print(f"DEBUG: Summarized results shape: {summarized_results.shape if summarized_results is not None else 'None'}")
+    
+    if summarized_results is None or summarized_results.empty:
+        print(f"DEBUG: No results to summarize")
+        return None
+        
     summarized_results.index.name = 'featureid'
     results_metadata = Metadata(summarized_results)
 
