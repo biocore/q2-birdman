@@ -1,16 +1,17 @@
 channels:
-- https://packages.qiime2.org/qiime2/2024.10/amplicon/staged
+- https://packages.qiime2.org/qiime2/2024.10/amplicon/released
 - conda-forge
 - bioconda
 dependencies:
   - qiime2-amplicon
-  - pip
   - conda-forge::biom-format
+  - conda-forge::cmdstanpy>1.0.1
   - conda-forge::patsy
   - conda-forge::xarray
   - conda-forge::arviz
-  - conda-forge::cmdstanpy
   - conda-forge::seaborn
+  - pip
   - pip:
     - q2-birdman@git+https://github.com/lucaspatel/q2-birdman@main
     - birdman==0.1.0 
+  - conda-forge::cmdstanpy>1.0.1
