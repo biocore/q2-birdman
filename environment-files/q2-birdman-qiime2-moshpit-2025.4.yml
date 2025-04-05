@@ -4,7 +4,7 @@ channels:
 - bioconda
 dependencies:
   - qiime2-moshpit
-  - conda-forge::cmdstanpy
+  - conda-forge::cmdstanpy>1.0.1
   - conda-forge::biom-format
   - conda-forge::patsy
   - conda-forge::xarray
@@ -14,4 +14,4 @@ dependencies:
   - pip:
     - q2-birdman@git+https://github.com/lucaspatel/q2-birdman@main
     - birdman==0.1.0
-  - conda-forge::cmdstanpy # intentionally duplicated
+  - conda-forge::cmdstanpy>1.0.1

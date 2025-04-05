@@ -3,9 +3,9 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-from qiime2 import Visualization
-from qiime2.plugin import Str, Bool, Metadata
+from qiime2 import Visualization, Artifact, Metadata
 from q2_types.metadata import ImmutableMetadata
+from q2_types.feature_data import FeatureData, Taxonomy
 from typing import List, Dict, Any, Optional, Tuple
 import json
 import re
@@ -48,7 +48,18 @@ def _unpack_hdi_and_filter(df, col):
 
     return df
 
-def _display_top_n_feats(df, n, yvar, xvar, xlab, ylab, title, outdir):
+def _parse_taxon(taxon):
+    levels = taxon.split(';')
+    genus = levels[-2].strip() if len(levels) > 1 else ""
+    species = levels[-1].strip() if len(levels) > 0 else ""
+    
+    # Replace placeholder values (e.g., 'g__', 's__') with an empty string
+    genus = genus if not genus.endswith("__") else ""
+    species = species if not species.endswith("__") else ""
+    
+    return genus, species
+
+def _display_top_n_feats(df, n, yvar, xvar, xlab, ylab, title, outdir, invert=False):
     if df.shape[0] < 2 * n:
         df_for_display = df
     else:
@@ -56,22 +67,39 @@ def _display_top_n_feats(df, n, yvar, xvar, xlab, ylab, title, outdir):
         topn = df[-1 * n :]
         df_for_display = pd.concat([bottomn, topn])
 
-    sns.stripplot(data=df_for_display, y=yvar, x=xvar)
+    if invert:
+        df_for_display = df_for_display.iloc[::-1]
+        df_for_display[xvar] = df_for_display[xvar] * -1
+        df_for_display[['lower', 'upper']] = df_for_display[['upper', 'lower']]
+
+    # Check for duplicated labels
+    df_for_display[yvar] = df_for_display[yvar].astype(str)
+    duplicates = df_for_display.duplicated(subset=[yvar], keep=False)
+    df_for_display.loc[duplicates, yvar] += df_for_display[duplicates].groupby(yvar).cumcount().add(1).astype(str).radd(' #')
+
+    fig, ax = plt.subplots(figsize=(6, 10))
+    sns.stripplot(data=df_for_display, y=yvar, x=xvar, size=5, edgecolor='gray', linewidth=0.5, palette=['black'])
     plt.errorbar(
-        data=df_for_display,
-        x=xvar,
-        y=yvar,
-        xerr=df_for_display[["lower", "upper"]].T,
-        ls="none",
+        x=df_for_display[xvar],
+        y=np.arange(df_for_display.shape[0]),
+        xerr=df_for_display[['lower', 'upper']].T.values,
+        ls='none',
+        ecolor='gray'
     )
-    plt.ylabel(ylab)
-    plt.xlabel(xlab)
-    plt.title(title)
-    plt.savefig(f'{outdir}/{xlab.split("Ratio for ")[1]}_plot.png', bbox_inches='tight')
-    plt.savefig(f'{outdir}/{xlab.split("Ratio for ")[1]}_plot.svg', bbox_inches='tight')
+    
+    ax.set_ylabel(ylab, fontsize=14, fontweight='normal')
+    ax.set_xlabel(xlab, fontsize=14, fontweight='normal')
+    ax.set_title(title, fontsize=16, fontweight='bold')
+    
+    ax.tick_params(axis='x', labelsize=12)
+    ax.tick_params(axis='y', labelsize=12)
+    
+    plt.tight_layout()
+    plt.savefig(f'{outdir}/{xlab.split("Ratio for ")[1]}_plot.png', bbox_inches='tight', dpi=300)
+    plt.savefig(f'{outdir}/{xlab.split("Ratio for ")[1]}_plot.svg', bbox_inches='tight', dpi=300)
     plt.close()
 
-def plot(output_dir: str, results_artifact: Metadata, plot_var: str, flip: bool = False) -> None:
+def plot(output_dir: str, results_artifact: Metadata, plot_var: str, flip: bool = False, taxonomy: pd.DataFrame = None) -> None:
     """
     Create plots for BIRDMAn analysis results.
     
@@ -79,12 +107,14 @@ def plot(output_dir: str, results_artifact: Metadata, plot_var: str, flip: bool 
     ----------
     output_dir : str
         Directory where visualization outputs will be written
-    results_artifact : Metadata
+    results_artifact : ImmutableMetadata
         QIIME2 artifact containing BIRDMAn results
     plot_var : str
         Variable to plot (e.g. "host_age")
     flip : bool, optional
         Whether to flip the plot orientation, by default False
+    taxonomy : pd.DataFrame, optional
+        Optional taxonomy information to annotate features
     """
     # Load the metadata from the artifact
     df = results_artifact.to_dataframe()
@@ -94,15 +124,22 @@ def plot(output_dir: str, results_artifact: Metadata, plot_var: str, flip: bool 
     sub_df.rename_axis(index="Feature", inplace=True)
     sub_df = sub_df.sort_values(by=plot_var + "_mean")
 
+    # Add taxonomy information if provided
+    if taxonomy is not None:
+        sub_df['taxon'] = taxonomy.loc[sub_df.index]['Taxon']
+        sub_df['Genus'], sub_df['Species'] = zip(*sub_df['taxon'].apply(_parse_taxon))
+        yvar = 'Species'  # Use species as the y-axis label
+    else:
+        yvar = 'Feature'  # Use feature ID as the y-axis label
+
     # Create plot
     xlab = "Ratio for " + plot_var
-    ylab = "Features"
+    ylab = f"{plot_var} Feature"
     df_for_display = sub_df.reset_index()
     df_for_display = df_for_display.loc[df_for_display.credible == "yes"]
     
-    fig, ax = plt.subplots(figsize=(6, 10))
     _display_top_n_feats(
-        df_for_display, 25, "Feature", plot_var + "_mean", xlab, ylab, "Top Features", output_dir
+        df_for_display, 25, yvar, plot_var + "_mean", xlab, ylab, "Top Features", output_dir, flip
     )
 
     # Create index.html

@@ -7,9 +7,10 @@
 # ----------------------------------------------------------------------------
 
 import importlib
-from qiime2.plugin import Citations, Plugin, Str, Int, Visualization, Metadata, Bool
+from qiime2.plugin import Citations, Plugin, Str, Int, Metadata, Bool
 from q2_types.feature_table import FeatureTable, Frequency
 from q2_types.metadata import ImmutableMetadata
+from q2_types.feature_data import FeatureData, Taxonomy
 from q2_birdman import __version__
 from q2_birdman._methods import run
 from q2_birdman._visualizers import plot
@@ -29,22 +30,7 @@ plugin = Plugin(
     citations=[citations['Caporaso-Bolyen-2024']]
 )
 
-@plugin.register_transformer
-def _1(data: ImmutableMetadata) -> Metadata:
-    """
-    Transform an ImmutableMetadata artifact to a Metadata object.
-    
-    Parameters
-    ----------
-    data : ImmutableMetadata
-        The ImmutableMetadata artifact to transform
-        
-    Returns
-    -------
-    Metadata
-        A Metadata object containing the data from the ImmutableMetadata artifact
-    """
-    return data.view(Metadata)
+importlib.import_module('q2_birdman._transformers')
 
 plugin.methods.register_function(
     function=run,
@@ -83,16 +69,18 @@ plugin.methods.register_function(
 plugin.visualizers.register_function(
     function=plot,
     inputs={
+        'results_artifact': ImmutableMetadata,
+        'taxonomy': FeatureData[Taxonomy]
     },
     parameters={
-        'results_artifact': Metadata,
         'plot_var': Str,
         'flip': Bool
     },
     input_descriptions={
+        'results_artifact': 'QIIME2 artifact containing BIRDMAn results',
+        'taxonomy': 'Optional taxonomy information to annotate features'
     },
     parameter_descriptions={
-        'results_artifact': 'QIIME2 artifact containing BIRDMAn results',
         'plot_var': 'Variable to plot (e.g. "host_age")',
         'flip': 'Whether to flip the plot orientation [default: False]'
     },
@@ -101,4 +89,3 @@ plugin.visualizers.register_function(
     citations=[]
 )
 
-importlib.import_module('q2_birdman._transformers')

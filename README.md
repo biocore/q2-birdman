@@ -2,6 +2,8 @@
 
 A [QIIME 2](https://qiime2.org) plugin [developed](https://develop.qiime2.org) by Lucas Patel (lpatel@ucsd.edu). 🔌
 
+BIRDMAn is a framework for performing differential abundance on microbiome data through a Bayesian lens. `q2-birdman` implements the default NegativeBinomial model for both cross-sectional and longitudinal analyses. For more complex experimental designs, users are encouraged to use [BIRDMAn](https://github.com/biocore/BIRDMAn) directly, which enables utilization of custom models and more detailed inference results.
+
 ## Installation instructions
 
 **The following instructions are intended to be a starting point** and should be replaced when `q2-birdman` is ready to share with others.
