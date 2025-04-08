@@ -7,13 +7,14 @@
 # ----------------------------------------------------------------------------
 
 import importlib
-from qiime2.plugin import Citations, Plugin, Str, Int, Metadata, Bool
+from qiime2.plugin import Citations, Plugin, Str, Int, Metadata, Bool, Float, Range
 from q2_types.feature_table import FeatureTable, Frequency
 from q2_types.metadata import ImmutableMetadata
 from q2_types.feature_data import FeatureData, Taxonomy
 from q2_birdman import __version__
 from q2_birdman._methods import run
 from q2_birdman._visualizers import plot
+from q2_birdman._diff_abundance_plots import da_plot
 
 citations = Citations.load("citations.bib", package="q2_birdman")
 
@@ -86,6 +87,41 @@ plugin.visualizers.register_function(
     },
     name='Plot BIRDMAn Results',
     description='Create plots for BIRDMAn analysis results, showing the top features associated with a given variable.',
+    citations=[]
+)
+
+plugin.visualizers.register_function(
+    function=da_plot,
+    inputs={
+        'data': ImmutableMetadata,
+        'taxonomy': FeatureData[Taxonomy]
+    },
+    parameters={
+        'effect_size_label': Str,
+        'feature_id_label': Str,
+        'error_label': Str,
+        'effect_size_threshold': Float % Range(0.0, None, inclusive_start=True),
+        'feature_ids': Metadata,
+        'taxonomy_delimiter': Str,
+        'label_limit': Int,
+        'chart_style': Str
+    },
+    input_descriptions={
+        'data': 'The differential abundance analysis output to be plotted',
+        'taxonomy': 'Optional taxonomy information to annotate features'
+    },
+    parameter_descriptions={
+        'effect_size_label': 'Label for effect sizes in data [default: lfc]',
+        'feature_id_label': 'Label for feature ids in data [default: id]',
+        'error_label': 'Label for effect size errors in data [default: se]',
+        'effect_size_threshold': 'Exclude features with an absolute value of effect size less than this threshold [default: 0.0]',
+        'feature_ids': 'Exclude features if their ids are not included in this index [default: None]',
+        'taxonomy_delimiter': 'Delimiter used in taxonomy strings to split taxonomic levels [default: None]',
+        'label_limit': 'Set the maximum length that will be viewable for axis labels [default: None]',
+        'chart_style': 'Style of the plot, either "bar" or "forest" [default: bar]'
+    },
+    name='Differential Abundance Plot',
+    description='Generate bar plot views of differential abundance analysis output, showing enriched and depleted features with error bars.',
     citations=[]
 )
 

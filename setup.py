@@ -29,9 +29,14 @@ setup(
             ".plugin_setup:plugin"]
     },
     package_data={
-        "q2_birdman": ["citations.bib"],
+        "q2_birdman": [
+            "citations.bib",
+            "assets/diff_abundance_plots/*.html",
+            "assets/diff_abundance_plots/*.css",
+            "assets/diff_abundance_plots/*.js"
+        ],
         "q2_birdman.tests": ["data/*"],
-        "q2_birdman.src": ["stan/*.stan"],
+        "q2_birdman.src": ["stan/*.stan"]
     },
     zip_safe=False,
 )
