@@ -1,7 +1,10 @@
 #!/bin/bash
 
 #qiime birdman run --i-table q2_birdman/tests/data/94270_filtered.qza --m-metadata-file q2_birdman/tests/data/11913_filtered.tsv --p-formula "age" --o-output-dir q2_birdman/tests/out --p-threads 32
-qiime birdman plot --i-results-artifact q2_birdman/tests/out.qza --i-taxonomy q2_birdman/tests/data/wolr2_taxonomy.qza --p-plot-var "age" --o-visualization q2_birdman/tests/viz.qzv
+#qiime birdman plot --i-results-artifact q2_birdman/tests/out.qza  --p-plot-var "age" --o-visualization q2_birdman/tests/viz.qzv
+#qiime birdman da-plot --i-data q2_birdman/tests/out.qza --o-visualization q2_birdman/tests/da_viz.qzv
+
+qiime birdman da-plot --i-data q2_birdman/tests/out.qza --i-table q2_birdman/tests/data/94270_filtered.qza --m-metadata-file q2_birdman/tests/data/11913_filtered.tsv --o-visualization q2_birdman/tests/da_viz.qzv --p-palette rainbow
 
 #qiime birdman run --i-table q2_birdman/tests/data/metag.qza --m-metadata-file q2_birdman/tests/data/metadata.tsv --p-formula "host_age+sex+bmi_score+mind_score+assignment" --o-output-dir q2_birdman/tests/out --p-longitudinal True --p-subject-column "host_subject_id"
 
