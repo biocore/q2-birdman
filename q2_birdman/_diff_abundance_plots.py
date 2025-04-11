@@ -27,6 +27,16 @@ def _unpack_hdi_and_filter(df, col):
     pd.DataFrame
         DataFrame with unpacked HDI values and credible interval calculations
     """
+    # Get the base name of the effect size (e.g., 'Chordata[T.Vertebrate]' from 'Chordata[T.Vertebrate]_hdi')
+    base_name = col.replace('_hdi', '')
+    
+    # Create a clean mean column name without special characters
+    clean_mean_col = 'mean_effect'
+    
+    # Copy the mean values to the clean column
+    df[clean_mean_col] = df[base_name + '_mean']
+    
+    # Unpack HDI values
     df[["lower", "upper"]] = df[col].str.split(",", expand=True)
     
     # remove ( from lower and ) from upper and convert to float
@@ -35,8 +45,6 @@ def _unpack_hdi_and_filter(df, col):
 
     df["credible"] = np.where((df.lower > 0) | (df.upper < 0), "yes", "no")
 
-    # Keep the original HDI values for error bars
-    # No need to subtract mean as Altair expects the actual range values
     return df
 
 def _compute_sample_log_ratios(table_df, sub_df, effect_size_label):
@@ -206,6 +214,8 @@ def _create_metadata_visualization(sub_df, table_df, metadata_df, metadata_cols,
         col_data['is_numeric'] = pd.api.types.is_numeric_dtype(metadata_df[col])
         # Add statistical annotation
         col_data['stat_annotation'] = _create_statistical_annotation(col_data, col_data['is_numeric'].iloc[0])
+        # Calculate mean log ratio for each metadata value
+        col_data['mean_log_ratio'] = col_data.groupby('metadata_value')['log_ratio'].transform('mean')
         plot_data.append(col_data)
     
     # Combine all data
@@ -238,7 +248,8 @@ def _create_metadata_visualization(sub_df, table_df, metadata_df, metadata_cols,
     # Create scatter plot with conditional encoding
     scatter = base.mark_circle(size=60).encode(
         x=alt.X('metadata_value:Q', 
-                axis=alt.Axis(orient='bottom', title=None)),
+                axis=alt.Axis(orient='bottom', title=None),
+                sort=alt.SortField('mean_log_ratio', order='descending')),
         color=alt.Color('metadata_value:Q', 
                        scale=alt.Scale(scheme=palette),
                        legend=alt.Legend(title="Value"))
@@ -246,7 +257,8 @@ def _create_metadata_visualization(sub_df, table_df, metadata_df, metadata_cols,
         'datum.is_numeric == true'
     ) + base.mark_circle(size=60).encode(
         x=alt.X('metadata_value:N', 
-                axis=alt.Axis(orient='bottom', labelAngle=45, title=None)),
+                axis=alt.Axis(orient='bottom', labelAngle=45, title=None),
+                sort=alt.SortField('mean_log_ratio', order='descending')),
         color=alt.Color('metadata_value:N',
                        scale=alt.Scale(scheme=palette),
                        legend=alt.Legend(title="Category"))
@@ -255,22 +267,22 @@ def _create_metadata_visualization(sub_df, table_df, metadata_df, metadata_cols,
     )
     
     # Add boxplot for categorical data
-    boxplot = alt.Chart(plot_data).transform_filter(
-        alt.datum.metadata_column == selection
-    ).transform_filter(
-        'datum.is_numeric == false'
-    ).mark_boxplot(
-        extent='min-max',  # Show whiskers from min to max
-        size=30,  # Width of the box
-        opacity=0.3  # Make it semi-transparent
-    ).encode(
-        x=alt.X('metadata_value:N', 
-                axis=alt.Axis(orient='bottom', labelAngle=45, title=None)),
-        y=alt.Y('log_ratio:Q'),
-        color=alt.Color('metadata_value:N',
-                       scale=alt.Scale(scheme=palette),
-                       legend=None)  # Hide the boxplot legend since we already have one
-    )
+    # boxplot = alt.Chart(plot_data).transform_filter(
+    #     alt.datum.metadata_column == selection
+    # ).transform_filter(
+    #     'datum.is_numeric == false'
+    # ).mark_boxplot(
+    #     extent='min-max',  # Show whiskers from min to max
+    #     size=30,  # Width of the box
+    #     opacity=0.3  # Make it semi-transparent
+    # ).encode(
+    #     x=alt.X('metadata_value:N', 
+    #             axis=alt.Axis(orient='bottom', labelAngle=45, title=None)),
+    #     y=alt.Y('log_ratio:Q'),
+    #     color=alt.Color('metadata_value:N',
+    #                    scale=alt.Scale(scheme=palette),
+    #                    legend=None)  # Hide the boxplot legend since we already have one
+    # )
     
     # Add regression line for numeric data
     regression = alt.Chart(plot_data).transform_filter(
@@ -306,7 +318,7 @@ def _create_metadata_visualization(sub_df, table_df, metadata_df, metadata_cols,
     )
     
     # Combine all elements
-    plot = (boxplot + scatter + regression + annotation).resolve_scale(
+    plot = (scatter + regression + annotation).resolve_scale(
         x='independent',
         color='independent'
     )
@@ -328,7 +340,6 @@ def _plot_differentials(
         feature_id_label,
         effect_size_label,
         error_label,
-        feature_ids,
         effect_size_threshold,
         taxonomy_delimiter,
         label_limit,
@@ -342,6 +353,8 @@ def _plot_differentials(
         Directory to save the plot
     data : qiime2.Metadata
         Data to plot
+    taxonomy : pd.DataFrame
+        Taxonomy information to annotate features
     title : str
         Plot title
     feature_id_label : str
@@ -350,8 +363,6 @@ def _plot_differentials(
         Label for effect sizes
     error_label : str
         Label for error values
-    feature_ids : qiime2.Metadata
-        Optional feature IDs to include
     effect_size_threshold : float
         Minimum absolute effect size to include
     taxonomy_delimiter : str
@@ -372,13 +383,9 @@ def _plot_differentials(
     md_df = data.to_dataframe()
     sub_df = _unpack_hdi_and_filter(md_df, effect_size_label + "_hdi")
     sub_df.rename_axis(index="Feature", inplace=True)
-    sub_df = sub_df.sort_values(by=effect_size_label + "_mean")
+    sub_df = sub_df.sort_values(by='mean_effect')
 
-    if feature_ids is not None:
-        feature_ids_df = feature_ids.to_dataframe()
-        sub_df = sub_df[sub_df.index.isin(feature_ids_df.index)]
-
-    sub_df = sub_df[np.abs(sub_df[effect_size_label + "_mean"]) >= effect_size_threshold]
+    sub_df = sub_df[np.abs(sub_df['mean_effect']) >= effect_size_threshold]
     
     filter_credible = True
     if filter_credible:
@@ -389,9 +396,9 @@ def _plot_differentials(
 
     # Sort data by effect size (ascending for forest plot, descending for bar plot)
     if chart_style == "forest":
-        sub_df = sub_df.sort_values(by=effect_size_label + "_mean", ascending=True)
+        sub_df = sub_df.sort_values(by='mean_effect', ascending=True)
     else:
-        sub_df = sub_df.sort_values(by=effect_size_label + "_mean", ascending=False)
+        sub_df = sub_df.sort_values(by='mean_effect', ascending=False)
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -399,21 +406,27 @@ def _plot_differentials(
     fig_fn = Path(f'{safe_title}-birdman-{chart_style}-plot.html')
     fig_fp = output_dir / fig_fn
 
-    if taxonomy and taxonomy_delimiter is not None:
+    # Handle taxonomy labels
+    if taxonomy is not None and taxonomy_delimiter is not None:
         y_labels = []
         seen = Counter()
+        taxonomy_df = taxonomy
         for i, e in enumerate(sub_df.index):
-            if taxonomy_delimiter in e:
-                fields = [field for field in e.split(taxonomy_delimiter)
-                          if not field.endswith('__')]
+            if e in taxonomy_df.index:
+                tax_string = taxonomy_df.loc[e].iloc[0]
+                if taxonomy_delimiter in tax_string:
+                    fields = [field for field in tax_string.split(taxonomy_delimiter)
+                              if not field.endswith('__')]
+                else:
+                    fields = [tax_string]
+                most_specific = fields[-1]
+                if most_specific in seen:
+                    y_labels.append(f"{seen[most_specific]}: {most_specific} *")
+                else:
+                    y_labels.append(most_specific)
+                seen[most_specific] += 1
             else:
-                fields = [e]
-            most_specific = fields[-1]
-            if most_specific in seen:
-                y_labels.append(f"{seen[most_specific]}: {most_specific} *")
-            else:
-                y_labels.append(most_specific)
-            seen[most_specific] += 1
+                y_labels.append(e)
         sub_df['y_label'] = y_labels
         sub_df['feature'] = [id_.replace(taxonomy_delimiter, ' ')
                          for id_ in sub_df.index]
@@ -421,7 +434,7 @@ def _plot_differentials(
         sub_df['y_label'] = sub_df['feature'] = sub_df.index
 
     sub_df['enriched'] = ["enriched" if x else "depleted"
-                      for x in sub_df[effect_size_label + "_mean"] > 0]
+                      for x in sub_df['mean_effect'] > 0]
 
     # Use the HDI values directly for error bars
     sub_df['error-upper'] = sub_df['upper']
@@ -434,12 +447,12 @@ def _plot_differentials(
     if chart_style == "bar":
         # Bar chart with error bars
         bars = alt.Chart(sub_df).mark_bar().encode(
-            x=alt.X(effect_size_label + "_mean", title="Log Fold Change (LFC)"),
+            x=alt.X('mean_effect', title="Log Fold Change (LFC)"),
             y=shared_y,
-            tooltip=alt.Tooltip(["feature", effect_size_label + "_mean",
+            tooltip=alt.Tooltip(["feature", 'mean_effect',
                                  "error-lower", "error-upper"]),
             color=alt.Color('enriched', title="Relative to reference",
-                            scale=alt.Scale(scheme=palette),
+                            scale=alt.Scale(scheme=palette, reverse=True),
                             sort="descending")
         )
 
@@ -457,7 +470,7 @@ def _plot_differentials(
             x2='error-upper',
             y=shared_y,
             color=alt.Color('enriched', title="Relative to reference",
-                            scale=alt.Scale(scheme=palette),
+                            scale=alt.Scale(scheme=palette, reverse=True),
                             sort="descending")
         )
 
@@ -466,12 +479,12 @@ def _plot_differentials(
             stroke='black',
             strokeWidth=1
         ).encode(
-            x=alt.X(effect_size_label + "_mean"),
+            x=alt.X('mean_effect'),
             y=shared_y,
             color=alt.Color('enriched', title="Relative to reference",
-                            scale=alt.Scale(scheme=palette),
+                            scale=alt.Scale(scheme=palette, reverse=True),
                             sort="descending"),
-            tooltip=alt.Tooltip(["feature", effect_size_label + "_mean",
+            tooltip=alt.Tooltip(["feature", 'mean_effect',
                                  "error-lower", "error-upper"])
         )
 
@@ -503,8 +516,7 @@ def da_plot(output_dir: str,
             feature_id_label: str = 'id',
             error_label: str = 'se',
             effect_size_threshold: float = 0.0,
-            feature_ids: qiime2.Metadata = None,
-            taxonomy_delimiter: str = None,
+            taxonomy_delimiter: str = ';',
             label_limit: int = None,
             chart_style: str = "bar",
             palette: str = "category10") -> None:
@@ -517,7 +529,7 @@ def da_plot(output_dir: str,
     data : qiime2.Metadata
         The differential abundance analysis output to be plotted
     taxonomy : pd.DataFrame, optional
-        Optional taxonomy information to annotate features
+        Taxonomy information to annotate features
     table : biom.Table, optional
         The feature table containing the samples over which feature-based differential abundance was computed
     metadata : pd.DataFrame, optional
@@ -531,10 +543,8 @@ def da_plot(output_dir: str,
     effect_size_threshold : float, optional
         Exclude features with an absolute value of effect size less than this
         threshold, by default 0.0
-    feature_ids : qiime2.Metadata, optional
-        Exclude features if their ids are not included in this index, by default None
     taxonomy_delimiter : str, optional
-        Delimiter used in taxonomy strings to split taxonomic levels, by default None
+        Delimiter used in taxonomy strings to split taxonomic levels, by default ';'
     label_limit : int, optional
         Set the maximum length that will be viewable for axis labels, by default None
     chart_style : str, optional
@@ -569,7 +579,6 @@ def da_plot(output_dir: str,
                 feature_id_label=feature_id_label,
                 error_label=error_label,
                 effect_size_threshold=effect_size_threshold,
-                feature_ids=feature_ids,
                 taxonomy_delimiter=taxonomy_delimiter,
                 label_limit=label_limit,
                 chart_style=chart_style,

@@ -13,10 +13,14 @@ from joblib import Parallel, delayed
 from qiime2 import Metadata
 import biom
 import numpy as np
+import logging
 
 from .src.birdman_chunked import run_birdman_chunk
 from .src._utils import validate_table_and_metadata, validate_formula
 from .src._summarize import summarize_inferences
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def _create_dir(output_dir):
   sub_dirs = ["slurm_out", "logs", "inferences", "results", "plots"]
@@ -36,7 +40,7 @@ def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16,
     # Ensure number of threads doesn't exceed number of features
     num_features = table.shape[0]
     if threads > num_features:
-        print(f"Warning: Number of threads ({threads}) exceeds number of features ({num_features}). "
+        logger.warning(f"Number of threads ({threads}) exceeds number of features ({num_features}). "
               f"Reducing threads to {num_features}.")
         threads = num_features
     
@@ -54,12 +58,15 @@ def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16,
             "u_p": 1.0 # subject random effects prior
         })
     
-    chunks = min(20, num_features)  # Use at most 20 chunks, or fewer if there are fewer features 
+    chunks = min(20, num_features)
+    logger.info(f"Processing {num_features} features in {chunks} chunks using {threads} threads")
+    
     with tempfile.TemporaryDirectory() as output_dir:
         _create_dir(output_dir)
-        print(f"Using temporary directory: {output_dir}")
+        logger.info(f"Using temporary directory: {output_dir}")
 
         def run_chunk(chunk_num):
+            logger.info(f"Starting chunk {chunk_num}")
             run_birdman_chunk(
                 table=table,
                 metadata=metadata_df,
@@ -70,10 +77,13 @@ def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16,
                 longitudinal=longitudinal,
                 **extra_params
             )
+            logger.info(f"Completed chunk {chunk_num}")
 
-        Parallel(n_jobs=threads)(
+        # Use loky backend for better process management
+        results = Parallel(n_jobs=threads, backend='loky', verbose=10)(
             delayed(run_chunk)(i) for i in range(1, chunks + 1)
         )
+        logger.info("All chunks completed")
 
         summarized_results = summarize_inferences(output_dir)
         summarized_results.index.name = 'featureid'

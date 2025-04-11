@@ -103,7 +103,6 @@ plugin.visualizers.register_function(
         'feature_id_label': Str,
         'error_label': Str,
         'effect_size_threshold': Float % Range(0.0, None, inclusive_start=True),
-        'feature_ids': Metadata,
         'taxonomy_delimiter': Str,
         'label_limit': Int,
         'chart_style': Str,
@@ -111,7 +110,7 @@ plugin.visualizers.register_function(
     },
     input_descriptions={
         'data': 'The differential abundance analysis output to be plotted',
-        'taxonomy': 'Optional taxonomy information to annotate features',
+        'taxonomy': 'Taxonomy information to annotate features',
         'table': 'The feature table containing the samples over which feature-based differential abundance was computed',
     },
     parameter_descriptions={
@@ -120,8 +119,7 @@ plugin.visualizers.register_function(
         'feature_id_label': 'Label for feature ids in data [default: id]',
         'error_label': 'Label for effect size errors in data [default: se]',
         'effect_size_threshold': 'Exclude features with an absolute value of effect size less than this threshold [default: 0.0]',
-        'feature_ids': 'Exclude features if their ids are not included in this index [default: None]',
-        'taxonomy_delimiter': 'Delimiter used in taxonomy strings to split taxonomic levels [default: None]',
+        'taxonomy_delimiter': 'Delimiter used in taxonomy strings to split taxonomic levels [default: ;]',
         'label_limit': 'Set the maximum length that will be viewable for axis labels [default: None]',
         'chart_style': 'Style of the plot, either "bar" or "forest" [default: bar]',
         'palette': 'Color scheme for enriched/depleted features. Can be a discrete Altair scheme (e.g., "category10", "accent", "dark2", "paired", "set1", "set2", "set3", "tableau10", "tableau20") or a comma-separated pair of hex colors (e.g., "#4c78a8,#f58518") [default: category10]'

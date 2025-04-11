@@ -7,9 +7,12 @@ from birdman import ModelIterator
 import cmdstanpy
 import numpy as np
 import pandas as pd
+import logging
 from .logger import setup_loggers
 from .model_single import ModelSingle
 from .model_single_lme import ModelSingleLME
+
+logger = logging.getLogger(__name__)
 
 def run_birdman_chunk(
     table,
@@ -88,28 +91,33 @@ def run_birdman_chunk(
         os.makedirs(infdir, exist_ok=True)
         os.makedirs(tmpdir, exist_ok=True)
 
-        with TemporaryDirectory(dir=tmpdir) as t:
-            try:
-                model.compile_model()
-                model.fit_model()
-                model.fit_model(sampler_args={"output_dir": t})
-            except Exception as e:
-                birdman_logger.error(f"Error processing feature {feature_id}: {e}")
-                continue
+        try:
+            with TemporaryDirectory(dir=tmpdir) as t:
+                try:
+                    birdman_logger.info(f"Compiling model for feature {feature_id}")
+                    model.compile_model()
+                    birdman_logger.info(f"Fitting model for feature {feature_id}")
+                    model.fit_model()
+                    model.fit_model(sampler_args={"output_dir": t})
+                except Exception as e:
+                    birdman_logger.error(f"Error processing feature {feature_id}: {e}")
+                    continue
 
-            inf = model.to_inference()
-            birdman_logger.info(f"Inference results for feature {feature_id}")
+                inf = model.to_inference()
+                birdman_logger.info(f"Inference results for feature {feature_id}")
 
-            # report diagnostics
-            loo = az.loo(inf, pointwise=True)
-            rhat = az.rhat(inf)
-            if (rhat > 1.05).to_array().any().item():
-                birdman_logger.warning(f"{feature_id} has Rhat values > 1.05")
-            if any(map(np.isnan, loo.values[:3])):
-                birdman_logger.warning(f"{feature_id} has NaN elpd values")
+                # report diagnostics
+                loo = az.loo(inf, pointwise=True)
+                rhat = az.rhat(inf)
+                if (rhat > 1.05).to_array().any().item():
+                    birdman_logger.warning(f"{feature_id} has Rhat values > 1.05")
+                if any(map(np.isnan, loo.values[:3])):
+                    birdman_logger.warning(f"{feature_id} has NaN elpd values")
 
-            # save inference results
-            inf.to_netcdf(outfile)
-            birdman_logger.info(f"Saved to {outfile}")
-            time.sleep(10)
+                # save inference results
+                inf.to_netcdf(outfile)
+                birdman_logger.info(f"Saved to {outfile}")
+        except Exception as e:
+            birdman_logger.error(f"Error with temporary directory for feature {feature_id}: {e}")
+            continue
             
