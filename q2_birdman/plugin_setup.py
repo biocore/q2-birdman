@@ -7,14 +7,13 @@
 # ----------------------------------------------------------------------------
 
 import importlib
-from qiime2.plugin import Citations, Plugin, Str, Int, Bool, Float, Range, Metadata
+from qiime2.plugin import Citations, Plugin, Str, Int, Bool, Float, Range, Metadata, Choices
 from q2_types.feature_table import FeatureTable, Frequency
 from q2_types.metadata import ImmutableMetadata
 from q2_types.feature_data import FeatureData, Taxonomy
 from q2_birdman import __version__
 from q2_birdman._methods import run
 from q2_birdman._visualizers import plot
-from q2_birdman._diff_abundance_plots import da_plot
 
 citations = Citations.load("citations.bib", package="q2_birdman")
 
@@ -70,42 +69,16 @@ plugin.methods.register_function(
 plugin.visualizers.register_function(
     function=plot,
     inputs={
-        'results_artifact': ImmutableMetadata,
-        'taxonomy': FeatureData[Taxonomy]
-    },
-    parameters={
-        'plot_var': Str,
-        'flip': Bool
-    },
-    input_descriptions={
-        'results_artifact': 'QIIME2 artifact containing BIRDMAn results',
-        'taxonomy': 'Optional taxonomy information to annotate features'
-    },
-    parameter_descriptions={
-        'plot_var': 'Variable to plot (e.g. "host_age")',
-        'flip': 'Whether to flip the plot orientation [default: False]'
-    },
-    name='Plot BIRDMAn Results',
-    description='Create plots for BIRDMAn analysis results, showing the top features associated with a given variable.',
-    citations=[]
-)
-
-plugin.visualizers.register_function(
-    function=da_plot,
-    inputs={
         'data': ImmutableMetadata,
         'taxonomy': FeatureData[Taxonomy],
         'table': FeatureTable[Frequency],
     },
     parameters={
         'metadata': Metadata,
-        'effect_size_label': Str,
-        'feature_id_label': Str,
-        'error_label': Str,
         'effect_size_threshold': Float % Range(0.0, None, inclusive_start=True),
         'taxonomy_delimiter': Str,
         'label_limit': Int,
-        'chart_style': Str,
+        'chart_style': Str % Choices(['bar', 'forest']),
         'palette': Str
     },
     input_descriptions={
@@ -115,9 +88,6 @@ plugin.visualizers.register_function(
     },
     parameter_descriptions={
         'metadata': 'The sample metadata that includes the columns used in the analysis',
-        'effect_size_label': 'Label for effect sizes in data [default: lfc]',
-        'feature_id_label': 'Label for feature ids in data [default: id]',
-        'error_label': 'Label for effect size errors in data [default: se]',
         'effect_size_threshold': 'Exclude features with an absolute value of effect size less than this threshold [default: 0.0]',
         'taxonomy_delimiter': 'Delimiter used in taxonomy strings to split taxonomic levels [default: ;]',
         'label_limit': 'Set the maximum length that will be viewable for axis labels [default: None]',
@@ -128,4 +98,3 @@ plugin.visualizers.register_function(
     description='Generate bar plot views of differential abundance analysis output, showing enriched and depleted features with error bars.',
     citations=[]
 )
-

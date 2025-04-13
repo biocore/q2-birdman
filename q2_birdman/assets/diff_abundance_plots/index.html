@@ -6,7 +6,6 @@
         margin: 0;
         padding: 0;
         box-sizing: border-box;
-        overflow: hidden;
     }
     .container {
         display: flex;
@@ -15,15 +14,14 @@
         height: 100vh;
         padding: 20px;
         box-sizing: border-box;
-        overflow: hidden;
     }
     .plot-container {
         flex: 1;
-        min-width: 0; /* Prevents flex items from overflowing */
+        min-width: 0;
         height: 100%;
         display: flex;
         flex-direction: column;
-        overflow: hidden;
+        padding-bottom: 40px; /* Add padding for x-axis labels */
     }
     .plot-container h3 {
         margin: 0 0 10px 0;
@@ -32,7 +30,7 @@
         flex: 1;
         width: 100%;
         border: none;
-        overflow: hidden;
+        overflow: visible; /* Allow content to overflow if needed */
     }
     .hidden {
         display: none;
@@ -104,10 +102,13 @@
             document.getElementById('notes').classList.add('hidden');
             document.getElementById('figures').classList.add('hidden');
             document.getElementById('main-plot').src = './' + daPlotUrl;
+            const metadataPlotContainer = document.querySelector('.plot-container:nth-child(2)');
             if (metadataPlotUrl) {
                 document.getElementById('metadata-plot').src = './' + metadataPlotUrl;
+                metadataPlotContainer.style.display = 'flex';
             } else {
                 document.getElementById('metadata-plot').src = '';
+                metadataPlotContainer.style.display = 'none';
             }
         }
     </script>
