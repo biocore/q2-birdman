@@ -7,9 +7,12 @@ from birdman import ModelIterator
 import cmdstanpy
 import numpy as np
 import pandas as pd
+import logging
 from .logger import setup_loggers
 from .model_single import ModelSingle
 from .model_single_lme import ModelSingleLME
+
+logger = logging.getLogger(__name__)
 
 def run_birdman_chunk(
     table,
@@ -23,12 +26,11 @@ def run_birdman_chunk(
     num_warmup=500,
     beta_prior=5,
     inv_disp_sd=5,
-    logfile="q2_birdman/tests/",
     longitudinal=False,
     **kwargs
 ):
     FIDS = table.ids(axis="observation")
-    birdman_logger = setup_loggers(logfile)
+    birdman_logger = setup_loggers()
 
     # Choose appropriate model class and path
     if longitudinal:
@@ -74,46 +76,48 @@ def run_birdman_chunk(
     birdman_logger.info(f"Processing chunk number: {chunk_num}")
 
     for feature_id, model in chunk:
-        feature_num = np.where(FIDS == feature_id)[0].item()
+        feature_indices = np.where(FIDS == feature_id)[0]
+        if len(feature_indices) == 0:
+            birdman_logger.warning(f"Feature ID {feature_id} not found in FIDS")
+            continue
+        feature_num = feature_indices[0]
         feature_num_str = str(feature_num).zfill(4)
-        birdman_logger.info(f"Processing feature number: {feature_num_str}")
-        birdman_logger.info(f"Feature ID: {feature_id}")
+        birdman_logger.info(f"Processing feature {feature_id}")
 
         tmpdir = f"{inference_dir}/tmp/F{feature_num_str}_{feature_id}"
         infdir = f"{inference_dir}/inferences/"
         outfile = f"{inference_dir}/inferences/F{feature_num_str}_{feature_id}.nc"
-
+        
         os.makedirs(infdir, exist_ok=True)
         os.makedirs(tmpdir, exist_ok=True)
 
-        with TemporaryDirectory(dir=tmpdir) as t:
-            try:
-                # Compile and fit the model
-                model.compile_model()
-                model.fit_model()
-                model.fit_model(sampler_args={"output_dir": t})
-            except Exception as e:
-                birdman_logger.error(f"Error processing feature {feature_id}: {e}")
-                continue
+        try:
+            with TemporaryDirectory(dir=tmpdir) as t:
+                try:
+                    birdman_logger.info(f"Compiling model for feature {feature_id}")
+                    model.compile_model()
+                    birdman_logger.info(f"Fitting model for feature {feature_id}")
+                    model.fit_model()
+                    model.fit_model(sampler_args={"output_dir": t})
+                except Exception as e:
+                    birdman_logger.error(f"Error processing feature {feature_id}: {e}")
+                    continue
 
-            # Extract inference results and log them
-            inf = model.to_inference()
-            birdman_logger.info(f"Inference results for feature {feature_id}:")
-            birdman_logger.info(inf.posterior)
+                inf = model.to_inference()
+                birdman_logger.info(f"Inference results for feature {feature_id}")
 
-            # Calculate LOO and Rhat diagnostics
-            loo = az.loo(inf, pointwise=True)
-            rhat = az.rhat(inf)
-            birdman_logger.info("LOO diagnostics:")
-            birdman_logger.info(loo)
-            birdman_logger.info("Rhat diagnostics:")
-            birdman_logger.info(rhat)
-            if (rhat > 1.05).to_array().any().item():
-                birdman_logger.warning(f"{feature_id} has Rhat values > 1.05")
-            if any(map(np.isnan, loo.values[:3])):
-                birdman_logger.warning(f"{feature_id} has NaN elpd values")
+                # report diagnostics
+                loo = az.loo(inf, pointwise=True)
+                rhat = az.rhat(inf)
+                if (rhat > 1.05).to_array().any().item():
+                    birdman_logger.warning(f"{feature_id} has Rhat values > 1.05")
+                if any(map(np.isnan, loo.values[:3])):
+                    birdman_logger.warning(f"{feature_id} has NaN elpd values")
 
-            # Save inference to NetCDF file
-            inf.to_netcdf(outfile)
-            birdman_logger.info(f"Saved to {outfile}")
-            time.sleep(10)
+                # save inference results
+                inf.to_netcdf(outfile)
+                birdman_logger.info(f"Saved to {outfile}")
+        except Exception as e:
+            birdman_logger.error(f"Error with temporary directory for feature {feature_id}: {e}")
+            continue
+            

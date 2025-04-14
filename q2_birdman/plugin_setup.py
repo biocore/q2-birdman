@@ -6,11 +6,14 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
-from qiime2.plugin import Citations, Plugin, Str, Int, Visualization, Metadata, Bool
+import importlib
+from qiime2.plugin import Citations, Plugin, Str, Int, Bool, Float, Range, Metadata, Choices
 from q2_types.feature_table import FeatureTable, Frequency
 from q2_types.metadata import ImmutableMetadata
+from q2_types.feature_data import FeatureData, Taxonomy
 from q2_birdman import __version__
 from q2_birdman._methods import run
+from q2_birdman._visualizers import plot
 
 citations = Citations.load("citations.bib", package="q2_birdman")
 
@@ -26,6 +29,8 @@ plugin = Plugin(
     # you add.
     citations=[citations['Caporaso-Bolyen-2024']]
 )
+
+importlib.import_module('q2_birdman._transformers')
 
 plugin.methods.register_function(
     function=run,
@@ -61,3 +66,35 @@ plugin.methods.register_function(
     citations=[]
 )
 
+plugin.visualizers.register_function(
+    function=plot,
+    inputs={
+        'data': ImmutableMetadata,
+        'taxonomy': FeatureData[Taxonomy],
+        'table': FeatureTable[Frequency],
+    },
+    parameters={
+        'metadata': Metadata,
+        'effect_size_threshold': Float % Range(0.0, None, inclusive_start=True),
+        'taxonomy_delimiter': Str,
+        'label_limit': Int,
+        'chart_style': Str % Choices(['bar', 'forest']),
+        'palette': Str
+    },
+    input_descriptions={
+        'data': 'The differential abundance analysis output to be plotted',
+        'taxonomy': 'Taxonomy information to annotate features',
+        'table': 'The feature table containing the samples over which feature-based differential abundance was computed',
+    },
+    parameter_descriptions={
+        'metadata': 'The sample metadata that includes the columns used in the analysis',
+        'effect_size_threshold': 'Exclude features with an absolute value of effect size less than this threshold [default: 0.0]',
+        'taxonomy_delimiter': 'Delimiter used in taxonomy strings to split taxonomic levels [default: ;]',
+        'label_limit': 'Set the maximum length that will be viewable for axis labels [default: None]',
+        'chart_style': 'Style of the plot, either "bar" or "forest" [default: bar]',
+        'palette': 'Color scheme for enriched/depleted features. Can be a discrete Altair scheme (e.g., "category10", "accent", "dark2", "paired", "set1", "set2", "set3", "tableau10", "tableau20") or a comma-separated pair of hex colors (e.g., "#4c78a8,#f58518") [default: category10]'
+    },
+    name='Differential Abundance Plot',
+    description='Generate bar plot views of differential abundance analysis output, showing enriched and depleted features with error bars.',
+    citations=[]
+)

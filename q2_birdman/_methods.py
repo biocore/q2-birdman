@@ -19,6 +19,9 @@ from .src.birdman_chunked import run_birdman_chunk
 from .src._utils import validate_table_and_metadata, validate_formula
 from .src._summarize import summarize_inferences
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 def _create_dir(output_dir):
     sub_dirs = ["slurm_out", "logs", "inferences", "results", "plots"]
     for sub_dir in sub_dirs:
@@ -34,10 +37,16 @@ def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16,
     metadata_df = metadata.to_dataframe()
     extra_params = {}
     
-    # Only process longitudinal parameters if longitudinal=True
+    # Ensure number of threads doesn't exceed number of features
+    num_features = table.shape[0]
+    if threads > num_features:
+        logger.warning(f"Number of threads ({threads}) exceeds number of features ({num_features}). "
+              f"Reducing threads to {num_features}.")
+        threads = num_features
+    
     if longitudinal:
-        if subject_column not in metadata_df.columns:
-            raise ValueError(f"Subject column '{subject_column}' not found in metadata")
+        if subject_column is None or subject_column not in metadata_df.columns:
+            raise ValueError(f"Subject column '{subject_column}' must be specified and exist in metadata when using longitudinal=True")
             
         group_var_series = metadata_df[subject_column]
         samp_subj_map = group_var_series.astype("category").cat.codes + 1
@@ -46,34 +55,38 @@ def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16,
         extra_params.update({
             "S": len(groups),
             "subj_ids": samp_subj_map.values,
-            "u_p": 1.0  # Default value for subject random effects prior
+            "u_p": 1.0 # subject random effects prior
         })
     
-    # Create a temporary directory that will be automatically cleaned up
+    chunks = min(20, num_features)
+    logger.info(f"Processing {num_features} features in {chunks} chunks using {threads} threads")
+    
     with tempfile.TemporaryDirectory() as output_dir:
         _create_dir(output_dir)
-        logging.info(f"Working directory is {output_dir}")
+        logger.info(f"Using temporary directory: {output_dir}")
 
         def run_chunk(chunk_num):
-            log_path = os.path.join(output_dir, "logs", f"chunk_{chunk_num}.log")
+            logger.info(f"Starting chunk {chunk_num}")
             run_birdman_chunk(
                 table=table,
                 metadata=metadata_df,
                 formula=formula,
                 inference_dir=output_dir,
-                num_chunks=threads,
+                num_chunks=chunks,
                 chunk_num=chunk_num,
-                logfile=log_path,
                 longitudinal=longitudinal,
                 **extra_params
             )
+            logger.info(f"Completed chunk {chunk_num}")
 
-        Parallel(n_jobs=threads)(
-            delayed(run_chunk)(i) for i in range(1, threads + 1)
+        # Use loky backend for better process management
+        results = Parallel(n_jobs=threads, backend='loky', verbose=10)(
+            delayed(run_chunk)(i) for i in range(1, chunks + 1)
         )
+        logger.info("All chunks completed")
 
         summarized_results = summarize_inferences(output_dir)
         summarized_results.index.name = 'featureid'
         results_metadata = Metadata(summarized_results)
-        
+
         return results_metadata

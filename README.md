@@ -2,9 +2,9 @@
 
 A [QIIME 2](https://qiime2.org) plugin [developed](https://develop.qiime2.org) by Lucas Patel (lpatel@ucsd.edu). 🔌
 
-## Installation instructions
+BIRDMAn is a framework for performing differential abundance on microbiome data through a Bayesian lens. `q2-birdman` implements the default NegativeBinomial model for both cross-sectional and longitudinal analyses. For more complex experimental designs, users are encouraged to use [BIRDMAn](https://github.com/biocore/BIRDMAn) directly, which enables utilization of custom models and more detailed inference results.
 
-### Install Prerequisites
+## Installation
 
 [Miniconda](https://conda.io/miniconda.html) provides the `conda` environment and package manager, and is currently the only supported way to install QIIME 2.
 Follow the instructions for downloading and installing Miniconda.
@@ -15,38 +15,97 @@ After installing Miniconda and opening a new terminal, make sure you're running 
 conda update conda
 ```
 
-###  Install development version of `q2-birdman`
+Next, you'll want to create a conda environment for `q2-birdman`. For convenience, several pre-configured environments are provided under `./environment-files`. To install one, first clone this repository, then create a new environment from the file like so:
+```bash
+git clone https://github.com/lucaspatel/q2-birdman
+cd q2-birdman
 
-Next, you need to get into the top-level `q2-birdman` directory.
-If you already have this (e.g., because you just created the plugin), this may be as simple as running `cd q2-birdman`.
-If not, you'll need the `q2-birdman` directory on your computer.
-How you do that will differ based on how the package is shared, and ideally the developer will update these instructions to be more specific (remember, these instructions are intended to be a starting point).
-For example, if it's maintained in a GitHub repository, you can achieve this by [cloning the repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository).
-Once you have the directory on your computer, change (`cd`) into it.
-
-If you're in a conda environment, deactivate it by running `conda deactivate`.
-
-
-Then, run:
-
-```shell
-conda env create -n q2-birdman-dev --file ./environments/q2-birdman-qiime2-tiny-2025.4.yml
+conda env create \
+ -n q2-birdman \
+ -f https://raw.githubusercontent.com/biocore/q2-birdman/main/environment-files/q2-birdman-qiime2-<target-distribution>-<target-epoch>.yml
 ```
 
-After this completes, activate the new environment you created by running:
+Replace `<target-distribution>` with either `amplicon`, `moshpit`, or `tiny` and `<target-epoch>` with either `2024.5` or `2025.4`.
 
-```shell
-conda activate q2-birdman-dev
+For example, to install q2-birdman with QIIME2 amplicon distribution 2025.4:
+
+```bash
+conda env create \
+ -n q2-birdman \
+ -f https://raw.githubusercontent.com/biocore/q2-birdman/main/environment-files/q2-birdman-qiime2-amplicon-2025.4.yml
 ```
 
-Next, run:
+After installation, activate the environment:
 
+```bash
+conda activate q2-birdman
+```
+
+###  Installing `q2-birdman`
+
+To install the plugin, simply write:
 ```shell
 make install
 ```
 
+If you are configuring your own environment, we encourage using a version of `cmdstanpy` from conda-forge, rather than from pip. If you choose to install `cmdstanpy` from pip, you must, you must compile the default Negative Binomial model directly (via Python):
+```python
+import cmdstanpy
+cmdstanpy.CmdStanModel(stan_file="q2_birdman/src/stan/negative_binomial_single.stan")
+```
 
-## Testing and using the most recent development version of `q2-birdman`
+## Using q2-BIRDMAn
+
+`q2-birdman` provides two main commands: `run` and `plot`. The `run` command performs Bayesian differential abundance analysis on your feature table, while `plot` visualizes the results.
+
+### Running BIRDMAn
+
+The `run` command requires a feature table (`.qza`), metadata file (`.tsv`), and a formula specifying the model. For example, to analyze the effect of age on microbial abundances:
+
+```bash
+qiime birdman run \
+  --i-table feature-table.qza \
+  --m-metadata-file metadata.tsv \
+  --p-formula "age" \
+  --o-output-dir results.qza \
+  --p-threads 32
+```
+
+The formula can include multiple variables and interactions. For longitudinal studies, you can use the `--p-longitudinal` flag and specify a subject column:
+
+```bash
+qiime birdman run \
+  --i-table feature-table.qza \
+  --m-metadata-file metadata.tsv \
+  --p-formula "age+sex+bmi_score" \
+  --o-output-dir results.qza \
+  --p-longitudinal True \
+  --p-subject-column "host_subject_id"
+```
+
+### Visualizing Results
+
+After running the analysis, you can visualize the results using the `plot` command. This creates an interactive visualization showing the differential abundance of features:
+
+```bash
+qiime birdman plot \
+  --i-data results.qza \
+  --i-table feature-table.qza \
+  --m-metadata-file metadata.tsv \
+  --o-visualization plot.qzv \
+  --p-palette rainbow \
+  --p-chart-style forest \
+  --p-effect-size-threshold 2
+```
+
+The visualization supports various options:
+- `--p-palette`: Color scheme for enriched/depleted features
+- `--p-chart-style`: Plot style (e.g., "forest" or "bar")
+- `--p-effect-size-threshold`: Minimum absolute effect size to include
+- `--i-taxonomy`: Optional taxonomy file for feature annotation
+- `--p-taxonomy-delimiter`: Delimiter used in taxonomy strings
+
+## Testing `q2-birdman`
 
 After completing the install steps above, confirm that everything is working as expected by running:
 
@@ -54,8 +113,7 @@ After completing the install steps above, confirm that everything is working as 
 make test
 ```
 
-You should get a report that tests were run, and you should see that all tests passed and none failed.
-It's usually ok if some warnings are reported.
+You should get a report that tests were run, and you should see that all tests passed and none failed. It's usually ok if some warnings are reported.
 
 If all of the tests pass, you're ready to use the plugin.
 Start by making QIIME 2's command line interface aware of `q2-birdman` by running:
