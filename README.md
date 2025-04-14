@@ -4,9 +4,7 @@ A [QIIME 2](https://qiime2.org) plugin [developed](https://develop.qiime2.org) b
 
 BIRDMAn is a framework for performing differential abundance on microbiome data through a Bayesian lens. `q2-birdman` implements the default NegativeBinomial model for both cross-sectional and longitudinal analyses. For more complex experimental designs, users are encouraged to use [BIRDMAn](https://github.com/biocore/BIRDMAn) directly, which enables utilization of custom models and more detailed inference results.
 
-## Installation instructions
-
-### Install Prerequisites
+## Installation
 
 [Miniconda](https://conda.io/miniconda.html) provides the `conda` environment and package manager, and is currently the only supported way to install QIIME 2.
 Follow the instructions for downloading and installing Miniconda.
@@ -137,6 +135,20 @@ qiime birdman --help
 ```
 
 Have fun! 😎
+
+## Issues
+
+If you encounter issues with cmdstanpy, you can try the following: we suggest installing cmdstanpy from conda-forge, overwritting the default from the provided conda environment:
+```shell
+pip uninstall cmdstanpy
+conda install -c conda-forge cmdstanpy=0.9.76
+```
+
+One cmdstanpy is installed, you must compile the default Negative Binomial model directly (via Python):
+```python
+import cmdstanpy
+cmdstanpy.CmdStanModel(stan_file="q2_birdman/src/stan/negative_binomial_single.stan")
+```
 
 ## About
 

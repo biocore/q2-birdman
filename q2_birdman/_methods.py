@@ -23,9 +23,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def _create_dir(output_dir):
-  sub_dirs = ["slurm_out", "logs", "inferences", "results", "plots"]
-  for sub_dir in sub_dirs:
-      os.makedirs(os.path.join(output_dir, sub_dir), exist_ok=True)
+    sub_dirs = ["slurm_out", "logs", "inferences", "results", "plots"]
+    for sub_dir in sub_dirs:
+        os.makedirs(os.path.join(output_dir, sub_dir), exist_ok=True)
 
 def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16, 
         longitudinal: bool = False, subject_column: str = None) -> Metadata:
