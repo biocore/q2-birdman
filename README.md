@@ -24,21 +24,19 @@ cd q2-birdman
 
 conda env create \
  -n q2-birdman \
- -f https://raw.githubusercontent.com/biocore/q2-birdman/main/environment-files/q2-birdman-qiime2-<target-distribution>-<target-epoch>.yml
+ -f ./environment-files/q2-birdman-qiime2-<target-distribution>-<target-epoch>.yml
 ```
 
 Replace `<target-distribution>` with either `amplicon`, `moshpit`, or `tiny` and `<target-epoch>` with either `2024.5` or `2025.4`.
 
 For example, to install q2-birdman with QIIME2 amplicon distribution 2025.4:
-
 ```bash
 conda env create \
  -n q2-birdman \
- -f https://raw.githubusercontent.com/biocore/q2-birdman/main/environment-files/q2-birdman-qiime2-amplicon-2025.4.yml
+ -f ./environment-files/q2-birdman-qiime2-amplicon-2025.4.yml
 ```
 
 After installation, activate the environment:
-
 ```bash
 conda activate q2-birdman
 ```
@@ -50,7 +48,7 @@ To install the plugin, simply write:
 make install
 ```
 
-If you are configuring your own environment, we encourage using a version of `cmdstanpy` from conda-forge, rather than from pip. If you choose to install `cmdstanpy` from pip, you must, you must compile the default Negative Binomial model directly (via Python):
+If you are configuring your own environment, we encourage using a version of `cmdstanpy` from conda-forge, rather than from pip. If you choose to install `cmdstanpy` from pip, you must compile the default Negative Binomial model directly (via Python):
 ```python
 import cmdstanpy
 cmdstanpy.CmdStanModel(stan_file="q2_birdman/src/stan/negative_binomial_single.stan")
@@ -74,7 +72,6 @@ qiime birdman run \
 ```
 
 The formula can include multiple variables and interactions. For longitudinal studies, you can use the `--p-longitudinal` flag and specify a subject column:
-
 ```bash
 qiime birdman run \
   --i-table feature-table.qza \
@@ -88,7 +85,6 @@ qiime birdman run \
 ### Visualizing Results
 
 After running the analysis, you can visualize the results using the `plot` command. This creates an interactive visualization showing the differential abundance of features:
-
 ```bash
 qiime birdman plot \
   --i-data results.qza \
@@ -110,7 +106,6 @@ The visualization supports various options:
 ## Testing `q2-birdman`
 
 After completing the install steps above, confirm that everything is working as expected by running:
-
 ```shell
 make test
 ```
@@ -119,19 +114,16 @@ You should get a report that tests were run, and you should see that all tests p
 
 If all of the tests pass, you're ready to use the plugin.
 Start by making QIIME 2's command line interface aware of `q2-birdman` by running:
-
 ```shell
 qiime dev refresh-cache
 ```
 
 You should then see the plugin in the list of available plugins if you run:
-
 ```shell
 qiime info
 ```
 
 You should be able to review the help text by running:
-
 ```shell
 qiime birdman --help
 ```
