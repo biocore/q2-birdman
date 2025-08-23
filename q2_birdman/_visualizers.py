@@ -1,6 +1,7 @@
 import importlib.resources
 from pathlib import Path
-import urllib.parse
+import re
+import os
 from collections import Counter
 
 import altair as alt
@@ -11,6 +12,34 @@ from scipy import stats
 import qiime2
 import q2templates
 import biom
+
+def _sanitize_filename(filename):
+    """Convert a string to a safe filename by replacing invalid characters.
+    
+    Parameters
+    ----------
+    filename : str
+        The string to convert to a safe filename
+        
+    Returns
+    -------
+    str
+        A safe filename with invalid characters replaced
+    """
+    # Replace invalid filesystem characters with underscores
+    # Windows: < > : " | ? * \ /
+    # Unix: / (and null bytes, but we can't have those in strings)
+    invalid_chars = r'[<>:"|?*\\/\[\]]'
+    safe_name = re.sub(invalid_chars, '_', filename)
+    
+    # Remove leading/trailing spaces and dots
+    safe_name = safe_name.strip(' .')
+    
+    # Ensure the filename isn't empty
+    if not safe_name:
+        safe_name = 'unnamed'
+    
+    return safe_name
 
 def _unpack_hdi_and_filter(df, col):
     """Unpack high density intervals from string format and parse credible intervals.
@@ -79,11 +108,26 @@ def _perform_kruskal_wallis(data, groups):
     groups = groups.dropna()
     data = data[groups.index]
     unique_groups = groups.unique()
-    if len(unique_groups) < 2:
+    
+    # check enough data
+    if (len(unique_groups) < 2 or len(data) < 3 or data.nunique() <= 1):
         return None, None
+    
     group_data = [data[groups == g] for g in unique_groups]
-    stat, pval = stats.kruskal(*group_data)
-    return stat, pval
+    
+    # check if any group has insufficient variation
+    if any(len(group) > 0 and group.nunique() <= 1 for group in group_data):
+        return None, None
+    
+    try:
+        stat, pval = stats.kruskal(*group_data)
+        return stat, pval
+    except ValueError as e:
+        # hndle cases where Kruskal-Wallis fails due to insufficient variation
+        if "All numbers are identical" in str(e):
+            return None, None
+        else:
+            raise e
 
 def _perform_pearson_correlation(x, y):
     """Perform Pearson correlation between two variables.
@@ -101,10 +145,24 @@ def _perform_pearson_correlation(x, y):
         (correlation coefficient, p-value)
     """
     mask = ~(x.isna() | y.isna())
-    if mask.sum() < 2:
+    x_clean = x[mask]
+    y_clean = y[mask]
+    
+    # Check all validation conditions at once
+    if (mask.sum() < 2 or 
+        x_clean.nunique() <= 1 or 
+        y_clean.nunique() <= 1):
         return None, None
-    r, pval = stats.pearsonr(x[mask], y[mask])
-    return r, pval
+    
+    try:
+        r, pval = stats.pearsonr(x_clean, y_clean)
+        return r, pval
+    except ValueError as e:
+        # handle cases where Pearson correlation fails due to insufficient variation
+        if "All numbers are identical" in str(e):
+            return None, None
+        else:
+            raise e
 
 def _create_statistical_annotation(data, is_numeric):
     """Create statistical annotation text for the plot.
@@ -154,13 +212,17 @@ def _create_metadata_visualization(sub_df, table_df, metadata_df, metadata_cols,
     # Filter features based on effect size threshold
     sub_df = sub_df[np.abs(sub_df[effect_size_label + '_mean']) >= effect_size_threshold]
     
-    # Return None if no features remain after filtering
-    if len(sub_df) == 0:
+    # Check all validation conditions at once
+    if (len(sub_df) == 0 or len(sub_df) < 2):
         return None
         
     log_ratios = _compute_sample_log_ratios(table_df, sub_df, effect_size_label)
     log_ratios['log_ratio'] = log_ratios['log_ratio'].replace([np.inf, -np.inf], np.nan)
     log_ratios = log_ratios.dropna()
+    
+    # Check remaining validation conditions
+    if (len(log_ratios) < 3 or log_ratios['log_ratio'].nunique() <= 1):
+        return None
     
     log_ratio_min = log_ratios['log_ratio'].min()
     log_ratio_max = log_ratios['log_ratio'].max()
@@ -322,10 +384,18 @@ def _plot_differentials(
 
     # Set up output directory and file path
     output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    safe_title = urllib.parse.quote(title)
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        raise ValueError(f"Failed to create output directory {output_dir}: {e}")
+    
+    safe_title = _sanitize_filename(title)
     fig_fn = Path(f'{safe_title}-birdman-{chart_style}-plot.html')
     fig_fp = output_dir / fig_fn
+    
+    # Ensure the output directory is writable
+    if not os.access(output_dir, os.W_OK):
+        raise ValueError(f"Output directory {output_dir} is not writable")
 
     if len(sub_df) == 0:
         # Create an empty chart with a message
@@ -341,8 +411,11 @@ def _plot_differentials(
             height=400,
             title=title
         )
-        empty_chart.save(fig_fp)
-        return fig_fp
+        try:
+            empty_chart.save(fig_fp)
+            return fig_fp
+        except Exception as e:
+            raise ValueError(f"Failed to save empty chart to {fig_fp}: {e}")
 
     if taxonomy is not None and taxonomy_delimiter is not None:
         y_labels = []
@@ -441,8 +514,11 @@ def _plot_differentials(
     else:
         sub_df = sub_df.sort_values(by='mean_effect', ascending=False)
 
-    chart.save(fig_fp)
-    return fig_fp
+    try:
+        chart.save(fig_fp)
+        return fig_fp
+    except Exception as e:
+        raise ValueError(f"Failed to save chart to {fig_fp}: {e}")
 
 
 def plot(output_dir: str,
@@ -492,6 +568,17 @@ def plot(output_dir: str,
     if not effect_size_columns:
         raise ValueError("No effect size columns found in input data. Expected columns ending with '_hdi'.")
     
+    # Check if effect size threshold might be too restrictive
+    if effect_size_threshold > 0:
+        total_features = len(df)
+        for hdi_col in effect_size_columns:
+            base_name = hdi_col.replace('_hdi', '')
+            filtered_count = len(df[np.abs(df[base_name + '_mean']) >= effect_size_threshold])
+            if filtered_count == 0:
+                print(f"WARNING: Effect size threshold ({effect_size_threshold}) for {base_name} filters out all {total_features} features. Consider using a lower threshold.")
+            elif filtered_count < 5:
+                print(f"WARNING: Effect size threshold ({effect_size_threshold}) for {base_name} leaves only {filtered_count}/{total_features} features. This may be too restrictive for meaningful analysis.")
+    
     # Create lists to store figure data
     da_figure_data = []
     metadata_figure_data = []
@@ -532,14 +619,27 @@ def plot(output_dir: str,
                     effect_size_threshold=effect_size_threshold, palette=palette)
                 if metadata_chart is not None:
                     print("Metadata chart created successfully")
-                    metadata_figure_fp = Path(output_dir) / f"{base_name}_metadata.html"
+                    safe_base_name = _sanitize_filename(base_name)
+                    metadata_figure_fp = Path(output_dir) / f"{safe_base_name}_metadata.html"
                     print(f"Saving metadata chart to {metadata_figure_fp}")
-                    metadata_chart.save(metadata_figure_fp)
-                    metadata_figure_fn = metadata_figure_fp.parts[-1]
-                    metadata_figure_data.append((True, metadata_figure_fn, base_name, None))
+                    try:
+                        metadata_chart.save(metadata_figure_fp)
+                        metadata_figure_fn = metadata_figure_fp.parts[-1]
+                        metadata_figure_data.append((True, metadata_figure_fn, base_name, None))
+                    except Exception as e:
+                        print(f"Failed to save metadata chart: {e}")
+                        metadata_figure_data.append((False, None, base_name, f"Failed to save: {e}")
                 else:
-                    print("Failed to create metadata chart")
-                    metadata_figure_data.append((False, None, base_name, "Could not create metadata visualization"))
+                    # Provide more specific error message
+                    filtered_df = df[np.abs(df[base_name + '_mean']) >= effect_size_threshold]
+                    if len(filtered_df) == 0:
+                        error_msg = f"Effect size threshold ({effect_size_threshold}) too restrictive - no features remain"
+                    elif len(filtered_df) < 2:
+                        error_msg = f"Effect size threshold ({effect_size_threshold}) too restrictive - only {len(filtered_df)} feature(s) remain"
+                    else:
+                        error_msg = "Insufficient variation in log ratios for statistical analysis"
+                    print(f"Failed to create metadata chart: {error_msg}")
+                    metadata_figure_data.append((False, None, base_name, error_msg))
             else:
                 print("No table or metadata provided for visualization")
                 metadata_figure_data.append((False, None, base_name, "No metadata or table provided"))
