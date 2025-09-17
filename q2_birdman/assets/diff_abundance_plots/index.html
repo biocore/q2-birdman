@@ -64,7 +64,7 @@
                 {% set meta_item = metadata_figures[i] %}
                 {% if da_item[0] %}
                     <li>
-                        <a href="#" onclick="loadPlots('{{ da_item[1] | urlencode }}', '{{ meta_item[1] | urlencode if meta_item[0] else "" }}')">{{ da_item[2] }}</a>
+                        <a href="#" onclick="loadPlots('{{ da_item[1] }}', '{{ meta_item[1] if meta_item[0] else "" }}')">{{ da_item[2] }}</a>
                     </li>
                 {% else %}
                     <li>Couldn't generate plot for {{ da_item[2] }}: {{ da_item[3] }}
