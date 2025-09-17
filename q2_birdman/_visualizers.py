@@ -628,7 +628,7 @@ def plot(output_dir: str,
                         metadata_figure_data.append((True, metadata_figure_fn, base_name, None))
                     except Exception as e:
                         print(f"Failed to save metadata chart: {e}")
-                        metadata_figure_data.append((False, None, base_name, f"Failed to save: {e}")
+                        metadata_figure_data.append((False, None, base_name, f"Failed to save: {e}"))
                 else:
                     # Provide more specific error message
                     filtered_df = df[np.abs(df[base_name + '_mean']) >= effect_size_threshold]
