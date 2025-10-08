@@ -41,6 +41,28 @@ def _sanitize_filename(filename):
     
     return safe_name
 
+def _escape_for_js(text):
+    """Escape a string for safe use in JavaScript contexts.
+    
+    Parameters
+    ----------
+    text : str
+        The string to escape
+        
+    Returns
+    -------
+    str
+        A JavaScript-safe string with special characters escaped
+    """
+    # Escape characters that can break JavaScript strings
+    text = text.replace('\\', '\\\\')  # Backslash must be first
+    text = text.replace("'", "\\'")     # Single quote
+    text = text.replace('"', '\\"')     # Double quote
+    text = text.replace('\n', '\\n')    # Newline
+    text = text.replace('\r', '\\r')    # Carriage return
+    text = text.replace('\t', '\\t')    # Tab
+    return text
+
 def _unpack_hdi_and_filter(df, col):
     """Unpack high density intervals from string format and parse credible intervals.
     
@@ -393,6 +415,9 @@ def _plot_differentials(
     fig_fn = Path(f'{safe_title}-birdman-{chart_style}-plot.html')
     fig_fp = output_dir / fig_fn
     
+    # Escape title for JavaScript contexts in Altair-generated HTML
+    escaped_title = _escape_for_js(title)
+    
     # Ensure the output directory is writable
     if not os.access(output_dir, os.W_OK):
         raise ValueError(f"Output directory {output_dir} is not writable")
@@ -409,7 +434,7 @@ def _plot_differentials(
         ).properties(
             width=500,
             height=400,
-            title=title
+            title=escaped_title
         )
         try:
             empty_chart.save(fig_fp)
@@ -469,7 +494,7 @@ def _plot_differentials(
             y=shared_y,
         )
 
-        chart = (bars + error).properties(title=title)
+        chart = (bars + error).properties(title=escaped_title)
     else:
         error_bars = alt.Chart(sub_df).mark_errorbar(extent='ci').encode(
             x=alt.X('error-lower', title="Log Fold Change (LFC)"),
@@ -494,7 +519,7 @@ def _plot_differentials(
                                  "error-lower", "error-upper"])
         )
 
-        chart = (error_bars + points).properties(title=title)
+        chart = (error_bars + points).properties(title=escaped_title)
 
     chart = chart.configure_legend(
         strokeColor='gray',

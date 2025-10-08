@@ -20,6 +20,7 @@ from qiime2.plugin.util import transform
 from q2_types.feature_table import BIOMV210Format
 from qiime2 import Metadata
 from q2_birdman._methods import _create_dir, run
+from q2_birdman._visualizers import _escape_for_js
 import patsy
 
 
@@ -191,3 +192,49 @@ class RunMethodTests(TestPluginBase):
         Test that formula contains variables with all non-null values.
         """
         pass
+
+
+class EscapeForJSTests(TestPluginBase):
+    package = 'q2_birdman.tests'
+
+    def test_escape_for_js_single_quotes(self):
+        """Test that single quotes are properly escaped for JavaScript contexts."""
+        input_str = "C(dx, Treatment('TD'))[T.ASD]"
+        expected = "C(dx, Treatment(\\'TD\\'))[T.ASD]"
+        result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
+
+    def test_escape_for_js_double_quotes(self):
+        """Test that double quotes are properly escaped for JavaScript contexts."""
+        input_str = 'var"with"double'
+        expected = 'var\\"with\\"double'
+        result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
+
+    def test_escape_for_js_backslashes(self):
+        """Test that backslashes are properly escaped for JavaScript contexts."""
+        input_str = "var\\with\\backslash"
+        expected = "var\\\\with\\\\backslash"
+        result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
+
+    def test_escape_for_js_newlines(self):
+        """Test that newlines are properly escaped for JavaScript contexts."""
+        input_str = "line1\nline2"
+        expected = "line1\\nline2"
+        result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
+
+    def test_escape_for_js_normal_string(self):
+        """Test that normal strings without special characters are unchanged."""
+        input_str = "normal_variable"
+        expected = "normal_variable"
+        result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
+
+    def test_escape_for_js_mixed_special_chars(self):
+        """Test escaping of mixed special characters."""
+        input_str = "var'with\"quotes\\and\nnewline"
+        expected = "var\\'with\\\"quotes\\\\and\\nnewline"
+        result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
