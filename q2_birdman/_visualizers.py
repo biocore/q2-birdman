@@ -32,6 +32,10 @@ def _sanitize_filename(filename):
     invalid_chars = r'[<>:"|?*\\/\[\]]'
     safe_name = re.sub(invalid_chars, '_', filename)
     
+    # Also replace characters that can break JavaScript when used in onclick attributes
+    js_unsafe_chars = r"['\"\n\r\t]"
+    safe_name = re.sub(js_unsafe_chars, '_', safe_name)
+    
     # Remove leading/trailing spaces and dots
     safe_name = safe_name.strip(' .')
     

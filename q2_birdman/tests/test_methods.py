@@ -20,7 +20,7 @@ from qiime2.plugin.util import transform
 from q2_types.feature_table import BIOMV210Format
 from qiime2 import Metadata
 from q2_birdman._methods import _create_dir, run
-from q2_birdman._visualizers import _escape_for_js
+from q2_birdman._visualizers import _escape_for_js, _sanitize_filename
 import patsy
 
 
@@ -237,4 +237,50 @@ class EscapeForJSTests(TestPluginBase):
         input_str = "var'with\"quotes\\and\nnewline"
         expected = "var\\'with\\\"quotes\\\\and\\nnewline"
         result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
+
+
+class SanitizeFilenameTests(TestPluginBase):
+    package = 'q2_birdman.tests'
+
+    def test_sanitize_filename_single_quotes(self):
+        """Test that single quotes are replaced with underscores in filenames."""
+        input_str = "C(dx, Treatment('TD'))[T.ASD]"
+        expected = "C(dx, Treatment(_TD_))[T.ASD]"
+        result = _sanitize_filename(input_str)
+        self.assertEqual(result, expected)
+
+    def test_sanitize_filename_double_quotes(self):
+        """Test that double quotes are replaced with underscores in filenames."""
+        input_str = 'var"with"double'
+        expected = 'var_with_double'
+        result = _sanitize_filename(input_str)
+        self.assertEqual(result, expected)
+
+    def test_sanitize_filename_filesystem_chars(self):
+        """Test that filesystem-invalid characters are replaced with underscores."""
+        input_str = "file<name>with:invalid|chars"
+        expected = "file_name_with_invalid_chars"
+        result = _sanitize_filename(input_str)
+        self.assertEqual(result, expected)
+
+    def test_sanitize_filename_newlines(self):
+        """Test that newlines are replaced with underscores in filenames."""
+        input_str = "line1\nline2"
+        expected = "line1_line2"
+        result = _sanitize_filename(input_str)
+        self.assertEqual(result, expected)
+
+    def test_sanitize_filename_normal_string(self):
+        """Test that normal strings without special characters are unchanged."""
+        input_str = "normal_variable"
+        expected = "normal_variable"
+        result = _sanitize_filename(input_str)
+        self.assertEqual(result, expected)
+
+    def test_sanitize_filename_mixed_special_chars(self):
+        """Test sanitization of mixed special characters."""
+        input_str = "var'with\"quotes\\and\nnewline:invalid"
+        expected = "var_with_quotes_and_newline_invalid"
+        result = _sanitize_filename(input_str)
         self.assertEqual(result, expected)
