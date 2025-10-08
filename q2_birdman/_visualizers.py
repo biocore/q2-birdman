@@ -321,7 +321,7 @@ def _create_metadata_visualization(sub_df, table_df, metadata_df, metadata_cols,
         y=alt.Y('log_ratio:Q')
     ).transform_regression(
         'metadata_value', 'log_ratio',
-        method='quad'
+        method='linear'
     )
     
     annotation = alt.Chart(plot_data).mark_text(
