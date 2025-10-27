@@ -221,7 +221,7 @@ def _create_metadata_visualization(sub_df, table_df, metadata_df, metadata_cols,
     Parameters
     ----------
     sub_df : pd.DataFrame
-        DataFrame containing differential abundance results
+        DataFrame containing differential abundance results (should be pre-filtered)
     table_df : pd.DataFrame
         Feature table DataFrame
     metadata_df : pd.DataFrame
@@ -231,14 +231,18 @@ def _create_metadata_visualization(sub_df, table_df, metadata_df, metadata_cols,
     effect_size_label : str
         Label for effect sizes in data
     effect_size_threshold : float, optional
-        Minimum absolute effect size to include, by default 0.0
+        Minimum absolute effect size to include, by default 0.0 (for validation only)
     palette : str
         Color scheme for metadata categories
     """
-    # Filter features based on effect size threshold
-    sub_df = sub_df[np.abs(sub_df[effect_size_label + '_mean']) >= effect_size_threshold]
+    # Note: sub_df should already be filtered by effect_size_threshold by the caller
+    # This is just a validation check
+    if effect_size_threshold > 0:
+        actual_filtered = sub_df[np.abs(sub_df[effect_size_label + '_mean']) >= effect_size_threshold]
+        if len(actual_filtered) != len(sub_df):
+            print(f"WARNING: DataFrame passed to _create_metadata_visualization was not properly pre-filtered")
     
-    # Check all validation conditions at once
+    # Check validation conditions
     if (len(sub_df) == 0 or len(sub_df) < 2):
         return None
         
@@ -641,10 +645,22 @@ def plot(output_dir: str,
                 metadata_cols = metadata_df.columns.tolist()
                 print(f"Available metadata columns: {metadata_cols}")
                 
+                # Create properly filtered DataFrame for metadata visualization
+                # This should match the filtering logic used in _plot_differentials
+                filtered_df = _unpack_hdi_and_filter(df, base_name + "_hdi")
+                filtered_df.rename_axis(index="Feature", inplace=True)
+                filtered_df = filtered_df.sort_values(by='mean_effect')
+                filtered_df = filtered_df[np.abs(filtered_df['mean_effect']) >= effect_size_threshold]
+                
+                # Apply credible filter (matching _plot_differentials logic)
+                filter_credible = True
+                if filter_credible:
+                    filtered_df = filtered_df[filtered_df.credible == "yes"]
+                
                 # Create metadata visualization
                 print("Creating metadata chart...")
                 metadata_chart = _create_metadata_visualization(
-                    df, table_df, metadata_df, metadata_cols, base_name, 
+                    filtered_df, table_df, metadata_df, metadata_cols, base_name, 
                     effect_size_threshold=effect_size_threshold, palette=palette)
                 if metadata_chart is not None:
                     print("Metadata chart created successfully")
