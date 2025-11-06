@@ -42,7 +42,10 @@ plugin.methods.register_function(
         'formula': Str,
         'threads': Int,
         'longitudinal': Bool,
-        'subject_column': Str
+        'subject_column': Str,
+        'beta_prior': Float % Range(0.0, None, inclusive_start=True),
+        'inv_disp_sd': Float % Range(0.0, None, inclusive_start=True),
+        'u_p': Float % Range(0.0, None, inclusive_start=True)
     },
     parameter_descriptions={
         'metadata': 'The sample metadata that includes the columns specified in the formula.',
@@ -51,7 +54,10 @@ plugin.methods.register_function(
         'longitudinal': ('Whether to use the longitudinal model with random effects for subjects. '
                         'If True, subject_column must also be specified. [default: False]'),
         'subject_column': ('Column name in metadata containing subject IDs for longitudinal analysis. '
-                          'Required only if longitudinal=True. [default: None]')
+                          'Required only if longitudinal=True. [default: None]'),
+        'beta_prior': 'Prior standard deviation for regression coefficients. Controls the strength of the prior on effect sizes. [default: 5.0]',
+        'inv_disp_sd': 'Prior standard deviation for inverse dispersion parameters. Controls the strength of the prior on dispersion. [default: 5.0]',
+        'u_p': 'Prior standard deviation for subject random effects in longitudinal analysis. Controls the strength of the prior on subject-specific effects. [default: 1.0]'
     },
     outputs=[('output_dir', ImmutableMetadata)],
     input_descriptions={

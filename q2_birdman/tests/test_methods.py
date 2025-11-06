@@ -20,6 +20,7 @@ from qiime2.plugin.util import transform
 from q2_types.feature_table import BIOMV210Format
 from qiime2 import Metadata
 from q2_birdman._methods import _create_dir, run
+from q2_birdman._visualizers import _escape_for_js, _sanitize_filename, _create_metadata_visualization, _compute_sample_log_ratios
 import patsy
 
 
@@ -191,3 +192,262 @@ class RunMethodTests(TestPluginBase):
         Test that formula contains variables with all non-null values.
         """
         pass
+
+
+class EscapeForJSTests(TestPluginBase):
+    package = 'q2_birdman.tests'
+
+    def test_escape_for_js_single_quotes(self):
+        """Test that single quotes are properly escaped for JavaScript contexts."""
+        input_str = "C(dx, Treatment('TD'))[T.ASD]"
+        expected = "C(dx, Treatment(\\'TD\\'))[T.ASD]"
+        result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
+
+    def test_escape_for_js_double_quotes(self):
+        """Test that double quotes are properly escaped for JavaScript contexts."""
+        input_str = 'var"with"double'
+        expected = 'var\\"with\\"double'
+        result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
+
+    def test_escape_for_js_backslashes(self):
+        """Test that backslashes are properly escaped for JavaScript contexts."""
+        input_str = "var\\with\\backslash"
+        expected = "var\\\\with\\\\backslash"
+        result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
+
+    def test_escape_for_js_newlines(self):
+        """Test that newlines are properly escaped for JavaScript contexts."""
+        input_str = "line1\nline2"
+        expected = "line1\\nline2"
+        result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
+
+    def test_escape_for_js_normal_string(self):
+        """Test that normal strings without special characters are unchanged."""
+        input_str = "normal_variable"
+        expected = "normal_variable"
+        result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
+
+    def test_escape_for_js_mixed_special_chars(self):
+        """Test escaping of mixed special characters."""
+        input_str = "var'with\"quotes\\and\nnewline"
+        expected = "var\\'with\\\"quotes\\\\and\\nnewline"
+        result = _escape_for_js(input_str)
+        self.assertEqual(result, expected)
+
+
+class SanitizeFilenameTests(TestPluginBase):
+    package = 'q2_birdman.tests'
+
+    def test_sanitize_filename_single_quotes(self):
+        """Test that single quotes are replaced with underscores in filenames."""
+        input_str = "C(dx, Treatment('TD'))[T.ASD]"
+        expected = "C(dx, Treatment(_TD_))[T.ASD]"
+        result = _sanitize_filename(input_str)
+        self.assertEqual(result, expected)
+
+    def test_sanitize_filename_double_quotes(self):
+        """Test that double quotes are replaced with underscores in filenames."""
+        input_str = 'var"with"double'
+        expected = 'var_with_double'
+        result = _sanitize_filename(input_str)
+        self.assertEqual(result, expected)
+
+    def test_sanitize_filename_filesystem_chars(self):
+        """Test that filesystem-invalid characters are replaced with underscores."""
+        input_str = "file<name>with:invalid|chars"
+        expected = "file_name_with_invalid_chars"
+        result = _sanitize_filename(input_str)
+        self.assertEqual(result, expected)
+
+    def test_sanitize_filename_newlines(self):
+        """Test that newlines are replaced with underscores in filenames."""
+        input_str = "line1\nline2"
+        expected = "line1_line2"
+        result = _sanitize_filename(input_str)
+        self.assertEqual(result, expected)
+
+    def test_sanitize_filename_normal_string(self):
+        """Test that normal strings without special characters are unchanged."""
+        input_str = "normal_variable"
+        expected = "normal_variable"
+        result = _sanitize_filename(input_str)
+        self.assertEqual(result, expected)
+
+    def test_sanitize_filename_mixed_special_chars(self):
+        """Test sanitization of mixed special characters."""
+        input_str = "var'with\"quotes\\and\nnewline:invalid"
+        expected = "var_with_quotes_and_newline_invalid"
+        result = _sanitize_filename(input_str)
+        self.assertEqual(result, expected)
+
+
+class LogRatioComputationTests(TestPluginBase):
+    package = 'q2_birdman.tests'
+
+    def test_log_ratio_computation_with_high_threshold(self):
+        """Test that log-ratios are not computed when effect size threshold filters out all features."""
+        # Create mock data with small effect sizes
+        np.random.seed(42)
+        features = [f"feature_{i}" for i in range(10)]
+        effect_sizes = np.random.normal(0, 0.1, 10)  # Small effect sizes
+        
+        sub_df = pd.DataFrame({
+            'lfc_mean': effect_sizes,
+            'lfc_hdi_low': effect_sizes - 0.1,
+            'lfc_hdi_high': effect_sizes + 0.1,
+            'credible': ['yes'] * 10
+        }, index=features)
+        
+        # Create mock feature table
+        samples = [f"sample_{i}" for i in range(5)]
+        table_df = pd.DataFrame(
+            np.random.poisson(10, (10, 5)),
+            index=features,
+            columns=samples
+        )
+        
+        # Create mock metadata
+        metadata_df = pd.DataFrame({
+            'group': ['A', 'B', 'A', 'B', 'A']
+        }, index=samples)
+        
+        # Test with a high threshold that filters out all features
+        high_threshold = 2.0  # Much higher than any effect size
+        
+        # Pre-filter the DataFrame (simulating the fixed behavior)
+        filtered_df = sub_df[np.abs(sub_df['lfc_mean']) >= high_threshold]
+        
+        # Should return None when no features pass the threshold
+        result = _create_metadata_visualization(
+            filtered_df, table_df, metadata_df, ['group'], 'lfc', 
+            effect_size_threshold=high_threshold
+        )
+        
+        self.assertIsNone(result, "Log-ratios should not be computed when no features pass the threshold")
+
+    def test_log_ratio_computation_with_low_threshold(self):
+        """Test that log-ratios are computed when effect size threshold allows some features."""
+        # Create mock data with mixed effect sizes
+        np.random.seed(42)
+        features = [f"feature_{i}" for i in range(10)]
+        effect_sizes = np.array([-0.8, -0.3, -0.1, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.2])
+        
+        sub_df = pd.DataFrame({
+            'lfc_mean': effect_sizes,
+            'lfc_hdi_low': effect_sizes - 0.1,
+            'lfc_hdi_high': effect_sizes + 0.1,
+            'credible': ['yes'] * 10
+        }, index=features)
+        
+        # Create mock feature table
+        samples = [f"sample_{i}" for i in range(5)]
+        table_df = pd.DataFrame(
+            np.random.poisson(10, (10, 5)),
+            index=features,
+            columns=samples
+        )
+        
+        # Create mock metadata
+        metadata_df = pd.DataFrame({
+            'group': ['A', 'B', 'A', 'B', 'A']
+        }, index=samples)
+        
+        # Test with a low threshold that allows some features
+        low_threshold = 0.2
+        
+        # Pre-filter the DataFrame
+        filtered_df = sub_df[np.abs(sub_df['lfc_mean']) >= low_threshold]
+        
+        # Should return a valid result when features pass the threshold
+        result = _create_metadata_visualization(
+            filtered_df, table_df, metadata_df, ['group'], 'lfc', 
+            effect_size_threshold=low_threshold
+        )
+        
+        self.assertIsNotNone(result, "Log-ratios should be computed when features pass the threshold")
+
+    def test_compute_sample_log_ratios_empty_features(self):
+        """Test that _compute_sample_log_ratios handles empty feature sets correctly."""
+        # Create mock data
+        features = [f"feature_{i}" for i in range(5)]
+        samples = [f"sample_{i}" for i in range(3)]
+        
+        # Empty DataFrame (no features pass threshold)
+        empty_sub_df = pd.DataFrame({
+            'lfc_mean': [],
+            'lfc_hdi_low': [],
+            'lfc_hdi_high': [],
+            'credible': []
+        }, index=[])
+        
+        table_df = pd.DataFrame(
+            np.random.poisson(10, (5, 3)),
+            index=features,
+            columns=samples
+        )
+        
+        # Should handle empty feature sets gracefully
+        result = _compute_sample_log_ratios(table_df, empty_sub_df, 'lfc')
+        
+        # Should return DataFrame with all samples but log_ratio should be log2(1/1) = 0
+        expected_log_ratio = np.log2(1)  # (0+1)/(0+1) = 1, log2(1) = 0
+        self.assertTrue(np.allclose(result['log_ratio'], expected_log_ratio))
+
+    def test_compute_sample_log_ratios_only_enriched(self):
+        """Test log-ratio computation when only enriched features are present."""
+        # Create mock data with only positive effect sizes
+        features = [f"feature_{i}" for i in range(3)]
+        samples = [f"sample_{i}" for i in range(3)]
+        
+        sub_df = pd.DataFrame({
+            'lfc_mean': [0.5, 0.8, 1.2],  # All positive
+            'lfc_hdi_low': [0.4, 0.7, 1.1],
+            'lfc_hdi_high': [0.6, 0.9, 1.3],
+            'credible': ['yes'] * 3
+        }, index=features)
+        
+        table_df = pd.DataFrame(
+            np.array([[10, 5, 8], [15, 12, 6], [20, 18, 10]]),
+            index=features,
+            columns=samples
+        )
+        
+        result = _compute_sample_log_ratios(table_df, sub_df, 'lfc')
+        
+        # Should compute log2(enriched_sums + 1) / (0 + 1) = log2(enriched_sums + 1)
+        enriched_sums = table_df.sum(axis=0)  # Sum of all features
+        expected_log_ratio = np.log2(enriched_sums + 1)
+        
+        self.assertTrue(np.allclose(result['log_ratio'], expected_log_ratio))
+
+    def test_compute_sample_log_ratios_only_depleted(self):
+        """Test log-ratio computation when only depleted features are present."""
+        # Create mock data with only negative effect sizes
+        features = [f"feature_{i}" for i in range(3)]
+        samples = [f"sample_{i}" for i in range(3)]
+        
+        sub_df = pd.DataFrame({
+            'lfc_mean': [-0.5, -0.8, -1.2],  # All negative
+            'lfc_hdi_low': [-0.6, -0.9, -1.3],
+            'lfc_hdi_high': [-0.4, -0.7, -1.1],
+            'credible': ['yes'] * 3
+        }, index=features)
+        
+        table_df = pd.DataFrame(
+            np.array([[10, 5, 8], [15, 12, 6], [20, 18, 10]]),
+            index=features,
+            columns=samples
+        )
+        
+        result = _compute_sample_log_ratios(table_df, sub_df, 'lfc')
+        
+        # Should compute log2(0 + 1) / (depleted_sums + 1) = log2(1 / (depleted_sums + 1))
+        depleted_sums = table_df.sum(axis=0)  # Sum of all features
+        expected_log_ratio = np.log2(1 / (depleted_sums + 1))
+        
+        self.assertTrue(np.allclose(result['log_ratio'], expected_log_ratio))
