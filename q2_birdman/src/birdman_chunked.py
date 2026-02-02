@@ -1,6 +1,6 @@
 import os
 from tempfile import TemporaryDirectory
-import time
+
 import arviz as az
 import biom
 from birdman import ModelIterator

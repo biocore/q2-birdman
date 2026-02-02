@@ -65,4 +65,4 @@ class ModelSingleLME(SingleFeatureModel):
             include_observed_data=True,
             posterior_predictive="y_predict",
             log_likelihood="log_lhood"
-        ) 
+        )

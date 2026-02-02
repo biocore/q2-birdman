@@ -1,3 +1,5 @@
+import re
+
 import patsy
 import biom
 import pandas as pd
@@ -71,7 +73,9 @@ def validate_formula(formula, table, metadata):
                     base_name = str(factor.name())
                     if base_name.startswith('C('):
                         # Extract the column name from C() expression
-                        base_name = base_name.split('(')[1].split(',')[0].strip()
+                        match = re.match(r'C\(\s*([^,\)]+)', base_name)
+                        if match:
+                            base_name = match.group(1).strip()
                     base_columns.add(base_name)
 
         # Check if all required base columns exist in metadata

@@ -1,20 +1,12 @@
 from pkg_resources import resource_filename
 
 import biom
-# IF USING A DIFFERENT STAN MODEL, CHANGE HERE
 from birdman import SingleFeatureModel
 import numpy as np
 import pandas as pd
 
-# PROVIDE FILEPATH TO STAN MODEL
-# ENSURE THAT YOU HAVE COMPILED THIS MODEL BY 
-# ACTIVATING BIRDMAN ENVIRONMENT
-# OPENING PYTHON/IPYTHON  
-# IMPORTING CMDSTANPY, THEN RUNNING 
-# cmdstanpy.CmdStanModel(stan_file="path/to/model.stan")
 MODEL_PATH = resource_filename("q2_birdman.src", "stan/negative_binomial_single.stan")
 
-# NAME CLASS SOMETHING RELEVANT TO YOUR MODEL
 class ModelSingle(SingleFeatureModel):
     def __init__(
         self,
@@ -22,7 +14,6 @@ class ModelSingle(SingleFeatureModel):
         feature_id: str,
         metadata: pd.DataFrame,
         formula: str,
-        # OPTIONAL: CHANGE PARAMETERS
         beta_prior: float = 2.0,
         inv_disp_sd: float = 0.5,
         vi_iter=1000,
@@ -32,8 +23,8 @@ class ModelSingle(SingleFeatureModel):
         **kwargs
     ):
 
-        kwargs.pop('metadata', None)  # remove metadata if it's in kwargs, not sure
-        kwargs.pop('formula', None)   # remove formula if it's in kwargs, not sure
+        kwargs.pop('metadata', None)
+        kwargs.pop('formula', None)
 
         super().__init__(
             table=table,
@@ -50,7 +41,7 @@ class ModelSingle(SingleFeatureModel):
             "depth": np.log(table.sum(axis="sample")),
             "B_p": beta_prior,
             "inv_disp_sd": inv_disp_sd,
-	          "A": np.log(1 / table.shape[0])
+            "A": np.log(1 / table.shape[0])
         }
         self.add_parameters(param_dict)
 
