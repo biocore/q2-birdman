@@ -113,7 +113,7 @@ def _compute_sample_log_ratios(table_df, sub_df, effect_size_label):
     result = pd.DataFrame(index=table_df.columns)
     enriched_sums = table_df.loc[enriched_features].sum(axis=0)
     depleted_sums = table_df.loc[depleted_features].sum(axis=0)
-    result['log_ratio'] = np.log2((enriched_sums + 1) / (depleted_sums + 1))
+    result['log_ratio'] = np.log((enriched_sums + 1) / (depleted_sums + 1))
     return result
 
 def _perform_kruskal_wallis(data, groups):
@@ -245,7 +245,14 @@ def _create_metadata_visualization(sub_df, table_df, metadata_df, metadata_cols,
     # Check validation conditions
     if (len(sub_df) == 0 or len(sub_df) < 2):
         return None
-        
+
+    # Check for features in both directions (enriched AND depleted)
+    # Log-ratio computation requires features in both directions
+    enriched_count = (sub_df[effect_size_label + "_mean"] > 0).sum()
+    depleted_count = (sub_df[effect_size_label + "_mean"] < 0).sum()
+    if enriched_count == 0 or depleted_count == 0:
+        return None
+
     log_ratios = _compute_sample_log_ratios(table_df, sub_df, effect_size_label)
     log_ratios['log_ratio'] = log_ratios['log_ratio'].replace([np.inf, -np.inf], np.nan)
     log_ratios = log_ratios.dropna()
@@ -283,7 +290,7 @@ def _create_metadata_visualization(sub_df, table_df, metadata_df, metadata_cols,
     
     base = alt.Chart(plot_data).encode(
         y=alt.Y('log_ratio:Q', 
-                title='Log2(Enriched/Depleted)',
+                title='ln(Enriched/Depleted)',
                 axis=alt.Axis(grid=True),
                 scale=alt.Scale(domain=log_ratio_limits)),
         tooltip=['metadata_column', 'metadata_value', 'log_ratio']
@@ -676,13 +683,25 @@ def plot(output_dir: str,
                         metadata_figure_data.append((False, None, base_name, f"Failed to save: {e}"))
                 else:
                     # Provide more specific error message
-                    filtered_df = df[np.abs(df[base_name + '_mean']) >= effect_size_threshold]
-                    if len(filtered_df) == 0:
+                    # Re-filter to understand why creation failed
+                    check_df = _unpack_hdi_and_filter(df.copy(), base_name + "_hdi")
+                    check_df = check_df[check_df.credible == "yes"]
+                    check_df = check_df[np.abs(check_df['mean_effect']) >= effect_size_threshold]
+
+                    if len(check_df) == 0:
                         error_msg = f"Effect size threshold ({effect_size_threshold}) too restrictive - no features remain"
-                    elif len(filtered_df) < 2:
-                        error_msg = f"Effect size threshold ({effect_size_threshold}) too restrictive - only {len(filtered_df)} feature(s) remain"
+                    elif len(check_df) < 2:
+                        error_msg = f"Only {len(check_df)} feature(s) remain after filtering"
                     else:
-                        error_msg = "Insufficient variation in log ratios for statistical analysis"
+                        # Check if all features are in one direction
+                        enriched = (check_df['mean_effect'] > 0).sum()
+                        depleted = (check_df['mean_effect'] < 0).sum()
+                        if enriched == 0:
+                            error_msg = f"All {len(check_df)} credible features are depleted - cannot compute log-ratio"
+                        elif depleted == 0:
+                            error_msg = f"All {len(check_df)} credible features are enriched - cannot compute log-ratio"
+                        else:
+                            error_msg = "Insufficient variation in log ratios for statistical analysis"
                     print(f"Failed to create metadata chart: {error_msg}")
                     metadata_figure_data.append((False, None, base_name, error_msg))
             else:
