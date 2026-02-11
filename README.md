@@ -1,55 +1,22 @@
 # q2-birdman
 
-A [QIIME 2](https://qiime2.org) plugin [developed](https://develop.qiime2.org) by Lucas Patel (lpatel@ucsd.edu). 🔌
-
 BIRDMAn is a framework for performing differential abundance on microbiome data through a Bayesian lens. `q2-birdman` implements the default NegativeBinomial model for both cross-sectional and longitudinal analyses. For more complex experimental designs, users are encouraged to use [BIRDMAn](https://github.com/biocore/BIRDMAn) directly, which enables utilization of custom models and more detailed inference results.
 
 ## Installation
 
-[Miniconda](https://conda.io/miniconda.html) provides the `conda` environment and package manager, and is currently the only supported way to install QIIME 2.
-Follow the instructions for downloading and installing Miniconda.
+`q2-birdman` requires an existing [QIIME 2](https://docs.qiime2.org) environment. Follow the [QIIME 2 installation instructions](https://docs.qiime2.org) to set one up before proceeding.
 
-After installing Miniconda and opening a new terminal, make sure you're running the latest version of `conda`:
-
+Once your QIIME 2 environment is active, install the BIRDMAn dependencies:
 ```bash
-conda update conda
+mamba install -c conda-forge biom-format patsy xarray arviz cmdstanpy
+pip install birdman==0.1.0
 ```
 
-Next, you'll want to create a conda environment for `q2-birdman`. For convenience, several pre-configured environments are provided under `./environment-files`. To install one, first clone this repository, then create a new environment from the file like so:
+Then clone and install the plugin:
 ```bash
 git clone https://github.com/lucaspatel/q2-birdman
 cd q2-birdman
-
-conda env create \
- -n q2-birdman \
- -f ./environment-files/q2-birdman-qiime2-<target-distribution>-<target-epoch>.yml
-```
-
-Replace `<target-distribution>` with either `amplicon`, `moshpit`, or `tiny` and `<target-epoch>` with either `2024.5` or `2025.4`.
-
-For example, to install q2-birdman with QIIME2 amplicon distribution 2025.4:
-```bash
-conda env create \
- -n q2-birdman \
- -f ./environment-files/q2-birdman-qiime2-amplicon-2025.4.yml
-```
-
-After installation, activate the environment:
-```bash
-conda activate q2-birdman
-```
-
-###  Installing `q2-birdman`
-
-To install the plugin, simply write:
-```shell
-make install
-```
-
-If you are configuring your own environment, we encourage using a version of `cmdstanpy` from conda-forge, rather than from pip. If you choose to install `cmdstanpy` from pip, you must compile the default Negative Binomial model directly (via Python):
-```python
-import cmdstanpy
-cmdstanpy.CmdStanModel(stan_file="q2_birdman/src/stan/negative_binomial_single.stan")
+pip install -e .
 ```
 
 ## Using q2-BIRDMAn
@@ -130,13 +97,7 @@ Have fun! 😎
 
 ## Issues
 
-If you encounter issues with cmdstanpy, you can try the following: we suggest installing cmdstanpy from conda-forge, overwritting the default from the provided conda environment:
-```shell
-pip uninstall cmdstanpy
-conda install -c conda-forge cmdstanpy=0.9.76
-```
-
-One cmdstanpy is installed, you must compile the default Negative Binomial model directly (via Python):
+If you encounter issues with `cmdstanpy`, ensure it was installed from conda-forge (as shown above) rather than from pip. If you installed `cmdstanpy` from pip, you must compile the default Negative Binomial model directly (via Python):
 ```python
 import cmdstanpy
 cmdstanpy.CmdStanModel(stan_file="q2_birdman/src/stan/negative_binomial_single.stan")

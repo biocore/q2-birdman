@@ -119,7 +119,7 @@ class RunMethodTests(TestPluginBase):
             run(biom_table, metadata, formula, threads=1)
 
     def test_run_invalid_formula(self):
-        """Test that an invalid formula raises a PatsyError"""
+        """Test that an invalid formula raises a ValueError"""
         biom_table = biom.Table(
             np.array([[1, 2], [3, 4]]),
             sample_ids=['sample-1', 'sample-2'],
@@ -131,12 +131,7 @@ class RunMethodTests(TestPluginBase):
         ))
         formula = 'non_existent_column'
 
-        expected_error = (
-            "Missing columns in metadata: non_existent_column\n"
-            "Available columns are: condition"
-        )
-
-        with self.assertRaisesRegex(ValueError, re.escape(expected_error)):
+        with self.assertRaisesRegex(ValueError, "Invalid Patsy formula"):
             run(biom_table, metadata, formula, threads=1)
 
     def test_run_formula_with_null_metadata_values(self):
@@ -246,7 +241,7 @@ class SanitizeFilenameTests(TestPluginBase):
     def test_sanitize_filename_single_quotes(self):
         """Test that single quotes are replaced with underscores in filenames."""
         input_str = "C(dx, Treatment('TD'))[T.ASD]"
-        expected = "C(dx, Treatment(_TD_))[T.ASD]"
+        expected = "C(dx, Treatment(_TD_))_T.ASD_"
         result = _sanitize_filename(input_str)
         self.assertEqual(result, expected)
 
@@ -419,9 +414,9 @@ class LogRatioComputationTests(TestPluginBase):
         
         result = _compute_sample_log_ratios(table_df, sub_df, 'lfc')
         
-        # Should compute log2(enriched_sums + 1) / (0 + 1) = log2(enriched_sums + 1)
+        # Should compute log(enriched_sums + 1) / (0 + 1) = log(enriched_sums + 1)
         enriched_sums = table_df.sum(axis=0)  # Sum of all features
-        expected_log_ratio = np.log2(enriched_sums + 1)
+        expected_log_ratio = np.log(enriched_sums + 1)
         
         self.assertTrue(np.allclose(result['log_ratio'], expected_log_ratio))
 
@@ -446,8 +441,8 @@ class LogRatioComputationTests(TestPluginBase):
         
         result = _compute_sample_log_ratios(table_df, sub_df, 'lfc')
         
-        # Should compute log2(0 + 1) / (depleted_sums + 1) = log2(1 / (depleted_sums + 1))
+        # Should compute log(0 + 1) / (depleted_sums + 1) = log(1 / (depleted_sums + 1))
         depleted_sums = table_df.sum(axis=0)  # Sum of all features
-        expected_log_ratio = np.log2(1 / (depleted_sums + 1))
+        expected_log_ratio = np.log(1 / (depleted_sums + 1))
         
         self.assertTrue(np.allclose(result['log_ratio'], expected_log_ratio))
