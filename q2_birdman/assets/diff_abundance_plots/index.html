@@ -1,0 +1,116 @@
+<html>
+<head>
+<style>
+    body {
+        font-family: Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    .container {
+        display: flex;
+        gap: 20px;
+        width: 100%;
+        height: 100vh;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+    .plot-container {
+        flex: 1;
+        min-width: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 40px; /* Add padding for x-axis labels */
+    }
+    .plot-container h3 {
+        margin: 0 0 10px 0;
+    }
+    .plot-frame {
+        flex: 1;
+        width: 100%;
+        border: none;
+        overflow: visible; /* Allow content to overflow if needed */
+    }
+    .hidden {
+        display: none;
+    }
+    .landing {
+        width: 60%;
+        padding: 20px;
+        padding-left: 40px;
+    }
+</style>
+<meta charset="UTF-8">
+</head>
+
+<body>
+    <div class="container hidden" id="plot-container">
+        <div class="plot-container">
+            <h3>Differential Abundance</h3>
+            <iframe class="plot-frame" id="main-plot"></iframe>
+        </div>
+        <div class="plot-container">
+            <h3>Log-Ratio Correlations</h3>
+            <iframe class="plot-frame" id="metadata-plot"></iframe>
+        </div>
+    </div>
+
+    <div class="landing">
+        <p id="header-text">Click a link to see the differential abundance plots for the specified category:</p>
+        <ul id="figures">
+            {% for i in range(da_figures|length) %}
+                {% set da_item = da_figures[i] %}
+                {% set meta_item = metadata_figures[i] %}
+                {% if da_item[0] %}
+                    <li>
+                        <a href="#" onclick="loadPlots('{{ da_item[1] }}', '{{ meta_item[1] if meta_item[0] else "" }}')">{{ da_item[2]|replace("'", "\\'") }}</a>
+                    </li>
+                {% else %}
+                    <li>Couldn't generate plot for {{ da_item[2] }}: {{ da_item[3] }}
+                {% endif %}
+            {% endfor %}
+        </ul>
+    
+        <div class="notes" id="notes">
+            <hr>
+            <p>Notes on interpreting plots with taxonomic feature identifiers:</p>
+            <ul>
+                <li>If taxonomic labels are used to identify features, the feature labels
+                (y-axis labels) in each plot represent the most specific named taxonomic level
+                associated with that feature.</li>
+    
+                <li>Hover over the bars in plots to see the full taxonomic label of each
+                feature identifier and information about its differential abundance relative
+                to the reference.</li>
+    
+                <li>Feature identifiers (y-axis labels) that are followed by an asterisk
+                (<code>*</code>) represent instances of a duplicated taxonomic name at the
+                level displayed in the feature identifier. The number preceding the feature
+                identifiers in these cases is used only for unique identification in the
+                current figure. It is not taxonomically meaningful, and it won't be
+                consistent across visualizations.</li>
+            </ul>
+        </div>
+    </div>
+    
+
+    <script>
+        function loadPlots(daPlotUrl, metadataPlotUrl) {
+            document.getElementById('plot-container').classList.remove('hidden');
+            document.getElementById('header-text').classList.add('hidden');
+            document.getElementById('notes').classList.add('hidden');
+            document.getElementById('figures').classList.add('hidden');
+            document.getElementById('main-plot').src = './' + daPlotUrl;
+            const metadataPlotContainer = document.querySelector('.plot-container:nth-child(2)');
+            if (metadataPlotUrl) {
+                document.getElementById('metadata-plot').src = './' + metadataPlotUrl;
+                metadataPlotContainer.style.display = 'flex';
+            } else {
+                document.getElementById('metadata-plot').src = '';
+                metadataPlotContainer.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

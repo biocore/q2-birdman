@@ -1,11 +1,15 @@
+import logging
 import re
+
 import arviz as az
 import pandas as pd
 from glob import glob
 from pathlib import Path
 from multiprocessing.pool import ThreadPool
-#from src._utils import _create_folder_without_clear
+
 from ._utils import _create_folder_without_clear
+
+logger = logging.getLogger(__name__)
 
 
 def _process_dataframe(df, feat_id, suffix=""):
@@ -48,7 +52,7 @@ def convert_types(df):
     return df
 
 def summarize_inferences_single_file(inf_file):
-    FEAT_REGEX = re.compile("F\d{4}_(.*).nc")
+    FEAT_REGEX = re.compile(r"F\d{4}_(.*).nc")
     try:
         this_feat_id = FEAT_REGEX.search(inf_file).groups()[0]
         this_feat_diff = az.from_netcdf(inf_file).posterior["beta_var"]
@@ -69,7 +73,7 @@ def summarize_inferences_single_file(inf_file):
             [this_feat_diff_mean, this_feat_diff_std, this_feat_diff_hdis], axis=1
         )
     except Exception as e:
-        print(f"Error processing file {inf_file}: {str(e)}")  # TODO: chaneg this to log
+        logger.error(f"Error processing file {inf_file}: {str(e)}")
         return None
 
 
@@ -88,4 +92,4 @@ def summarize_inferences(input_dir, threads=1):
         )
         return convert_types(all_feat_diffs_df)
     else:
-        print("No available feat_diff_dfs...")  # TODO: chaneg this to log
+        logger.warning("No available feat_diff_dfs...")
