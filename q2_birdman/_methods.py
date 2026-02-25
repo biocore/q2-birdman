@@ -14,10 +14,13 @@ from qiime2 import Metadata
 import biom
 import numpy as np
 import logging
+import cmdstanpy
 
 from .src.birdman_chunked import run_birdman_chunk
 from .src._utils import validate_table_and_metadata, validate_formula
 from .src._summarize import summarize_inferences
+from .src.model_single import MODEL_PATH as NB_MODEL_PATH
+from .src.model_single_lme import MODEL_PATH as NB_LME_MODEL_PATH
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -67,6 +70,14 @@ def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16,
     chunks = min(20, num_features)
     logger.info(f"Processing {num_features} features in {chunks} chunks using {threads} threads")
     
+    # Pre-compile the Stan model once before parallel workers start.
+    # Without this, parallel workers race to compile the same .stan file
+    # to the same output path, causing stale file handles and link failures.
+    stan_path = NB_LME_MODEL_PATH if longitudinal else NB_MODEL_PATH
+    logger.info(f"Pre-compiling Stan model: {stan_path}")
+    cmdstanpy.CmdStanModel(stan_file=stan_path)
+    logger.info("Stan model compiled successfully")
+
     with tempfile.TemporaryDirectory() as output_dir:
         _create_dir(output_dir)
         logger.info(f"Using temporary directory: {output_dir}")
@@ -92,6 +103,11 @@ def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16,
         logger.info("All chunks completed")
 
         summarized_results = summarize_inferences(output_dir)
+        if summarized_results is None:
+            raise RuntimeError(
+                "No inference results were produced. All features failed "
+                "during model fitting. Check the logs above for details."
+            )
         summarized_results.index.name = 'featureid'
         results_metadata = Metadata(summarized_results)
 
