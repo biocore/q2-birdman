@@ -444,5 +444,193 @@ class LogRatioComputationTests(TestPluginBase):
         # Should compute log(0 + 1) / (depleted_sums + 1) = log(1 / (depleted_sums + 1))
         depleted_sums = table_df.sum(axis=0)  # Sum of all features
         expected_log_ratio = np.log(1 / (depleted_sums + 1))
-        
+
         self.assertTrue(np.allclose(result['log_ratio'], expected_log_ratio))
+
+
+class ModelSingleTests(TestPluginBase):
+    package = 'q2_birdman.tests'
+
+    def setUp(self):
+        super().setUp()
+        self.table = biom.Table(
+            np.array([[10, 20, 30], [40, 50, 60]]),
+            sample_ids=['s1', 's2', 's3'],
+            observation_ids=['f1', 'f2']
+        )
+        self.metadata = pd.DataFrame(
+            {'group': ['A', 'B', 'A']},
+            index=pd.Index(['s1', 's2', 's3'])
+        )
+        self.formula = 'group'
+        self.feature_id = 'f1'
+
+    def test_default_depth_is_log_sample_sums(self):
+        from q2_birdman.src.model_single import ModelSingle
+        model = ModelSingle(
+            table=self.table,
+            feature_id=self.feature_id,
+            metadata=self.metadata,
+            formula=self.formula
+        )
+        expected = np.log(self.table.sum(axis='sample'))
+        np.testing.assert_array_almost_equal(model.dat['depth'], expected)
+
+    def test_default_A_is_log_inverse_num_features(self):
+        from q2_birdman.src.model_single import ModelSingle
+        model = ModelSingle(
+            table=self.table,
+            feature_id=self.feature_id,
+            metadata=self.metadata,
+            formula=self.formula
+        )
+        expected = np.log(1 / self.table.shape[0])
+        self.assertAlmostEqual(model.dat['A'], expected)
+
+    def test_absolute_depth_is_zeros(self):
+        from q2_birdman.src.model_single import ModelSingle
+        model = ModelSingle(
+            table=self.table,
+            feature_id=self.feature_id,
+            metadata=self.metadata,
+            formula=self.formula,
+            absolute=True
+        )
+        expected = np.zeros(self.table.shape[1])
+        np.testing.assert_array_almost_equal(model.dat['depth'], expected)
+
+    def test_absolute_A_is_zero(self):
+        from q2_birdman.src.model_single import ModelSingle
+        model = ModelSingle(
+            table=self.table,
+            feature_id=self.feature_id,
+            metadata=self.metadata,
+            formula=self.formula,
+            absolute=True
+        )
+        self.assertAlmostEqual(model.dat['A'], 0.0)
+
+
+class ModelSingleLMETests(TestPluginBase):
+    package = 'q2_birdman.tests'
+
+    def setUp(self):
+        super().setUp()
+        self.table = biom.Table(
+            np.array([[10, 20, 30], [40, 50, 60]]),
+            sample_ids=['s1', 's2', 's3'],
+            observation_ids=['f1', 'f2']
+        )
+        self.metadata = pd.DataFrame(
+            {'group': ['A', 'B', 'A']},
+            index=pd.Index(['s1', 's2', 's3'])
+        )
+        self.formula = 'group'
+        self.feature_id = 'f1'
+        self.subj_ids = np.array([1, 2, 1])
+        self.S = 2
+
+    def test_lme_default_depth_is_log_sample_sums(self):
+        from q2_birdman.src.model_single_lme import ModelSingleLME
+        model = ModelSingleLME(
+            table=self.table,
+            feature_id=self.feature_id,
+            metadata=self.metadata,
+            formula=self.formula,
+            subj_ids=self.subj_ids,
+            S=self.S
+        )
+        expected = np.log(self.table.sum(axis='sample'))
+        np.testing.assert_array_almost_equal(model.dat['depth'], expected)
+
+    def test_lme_absolute_depth_is_zeros(self):
+        from q2_birdman.src.model_single_lme import ModelSingleLME
+        model = ModelSingleLME(
+            table=self.table,
+            feature_id=self.feature_id,
+            metadata=self.metadata,
+            formula=self.formula,
+            subj_ids=self.subj_ids,
+            S=self.S,
+            absolute=True
+        )
+        expected = np.zeros(self.table.shape[1])
+        np.testing.assert_array_almost_equal(model.dat['depth'], expected)
+
+    def test_lme_absolute_A_is_zero(self):
+        from q2_birdman.src.model_single_lme import ModelSingleLME
+        model = ModelSingleLME(
+            table=self.table,
+            feature_id=self.feature_id,
+            metadata=self.metadata,
+            formula=self.formula,
+            subj_ids=self.subj_ids,
+            S=self.S,
+            absolute=True
+        )
+        self.assertAlmostEqual(model.dat['A'], 0.0)
+
+
+class RunAbsoluteThreadingTests(TestPluginBase):
+    package = 'q2_birdman.tests'
+
+    def setUp(self):
+        super().setUp()
+        self.table = biom.Table(
+            np.array([[10, 20], [30, 40]]),
+            sample_ids=['s1', 's2'],
+            observation_ids=['f1', 'f2']
+        )
+        self.metadata = Metadata(pd.DataFrame(
+            {'group': ['A', 'B']},
+            index=pd.Index(['s1', 's2'], name='#Sample ID')
+        ))
+        self.formula = 'group'
+
+    @patch('q2_birdman._methods.run_birdman_chunk')
+    @patch('q2_birdman._methods.summarize_inferences')
+    def test_run_passes_absolute_true(self, mock_summarize, mock_chunk):
+        mock_summarize.return_value = pd.DataFrame(
+            {'col': [1, 2]},
+            index=pd.Index(['f1', 'f2'], name='featureid')
+        )
+        run(self.table, self.metadata, self.formula, threads=1, absolute=True)
+        call_kwargs = mock_chunk.call_args
+        self.assertTrue(call_kwargs[1].get('absolute', False))
+
+    @patch('q2_birdman._methods.run_birdman_chunk')
+    @patch('q2_birdman._methods.summarize_inferences')
+    def test_run_default_absolute_false(self, mock_summarize, mock_chunk):
+        mock_summarize.return_value = pd.DataFrame(
+            {'col': [1, 2]},
+            index=pd.Index(['f1', 'f2'], name='featureid')
+        )
+        run(self.table, self.metadata, self.formula, threads=1)
+        call_kwargs = mock_chunk.call_args
+        self.assertFalse(call_kwargs[1].get('absolute', False))
+
+
+class ChunkAbsoluteThreadingTests(TestPluginBase):
+    package = 'q2_birdman.tests'
+
+    @patch('q2_birdman.src.birdman_chunked.ModelIterator')
+    def test_chunk_passes_absolute_to_model_iterator(self, mock_iter_cls):
+        from q2_birdman.src.birdman_chunked import run_birdman_chunk
+        mock_iter_cls.return_value = MagicMock(__len__=MagicMock(return_value=1))
+        mock_iter_cls.return_value.__getitem__ = MagicMock(return_value=iter([]))
+
+        table = biom.Table(
+            np.array([[10, 20], [30, 40]]),
+            sample_ids=['s1', 's2'],
+            observation_ids=['f1', 'f2']
+        )
+        metadata = pd.DataFrame({'group': ['A', 'B']}, index=['s1', 's2'])
+
+        run_birdman_chunk(
+            table=table, metadata=metadata, formula='group',
+            inference_dir='/tmp/test', num_chunks=1, chunk_num=1,
+            absolute=True
+        )
+
+        call_kwargs = mock_iter_cls.call_args[1]
+        self.assertTrue(call_kwargs.get('absolute', False))

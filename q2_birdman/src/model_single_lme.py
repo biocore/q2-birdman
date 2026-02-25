@@ -18,6 +18,7 @@ class ModelSingleLME(SingleFeatureModel):
         beta_prior: float = 2.0,
         inv_disp_sd: float = 0.5,
         u_p: float = 1.0,
+        absolute: bool = False,
         vi_iter=1000,
         num_draws=100,
         num_iter: int = 500,
@@ -26,6 +27,7 @@ class ModelSingleLME(SingleFeatureModel):
     ):
         kwargs.pop('metadata', None)
         kwargs.pop('formula', None)
+        kwargs.pop('absolute', None)
 
         super().__init__(
             table=table,
@@ -38,11 +40,18 @@ class ModelSingleLME(SingleFeatureModel):
 
         self.create_regression(formula=formula, metadata=metadata)
 
+        if absolute:
+            depth = np.zeros(table.shape[1])
+            A = 0.0
+        else:
+            depth = np.log(table.sum(axis="sample"))
+            A = np.log(1 / table.shape[0])
+
         param_dict = {
-            "depth": np.log(table.sum(axis="sample")),
+            "depth": depth,
             "B_p": beta_prior,
             "inv_disp_sd": inv_disp_sd,
-            "A": np.log(1 / table.shape[0]),
+            "A": A,
             "S": S,
             "subj_ids": subj_ids,
             "u_p": u_p
