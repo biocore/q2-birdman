@@ -27,6 +27,7 @@ def run_birdman_chunk(
     beta_prior=5,
     inv_disp_sd=5,
     longitudinal=False,
+    absolute=False,
     **kwargs
 ):
     FIDS = table.ids(axis="observation")
@@ -48,7 +49,8 @@ def run_birdman_chunk(
         "inv_disp_sd": inv_disp_sd,
         "chains": chains,
         "num_iter": num_iter,
-        "num_warmup": num_warmup
+        "num_warmup": num_warmup,
+        "absolute": absolute
     }
     
     # Add longitudinal-specific parameters if needed

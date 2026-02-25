@@ -27,9 +27,10 @@ def _create_dir(output_dir):
     for sub_dir in sub_dirs:
         os.makedirs(os.path.join(output_dir, sub_dir), exist_ok=True)
 
-def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16, 
+def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16,
         longitudinal: bool = False, subject_column: str = None,
-        beta_prior: float = 5.0, inv_disp_sd: float = 5.0, u_p: float = 1.0) -> Metadata:
+        beta_prior: float = 5.0, inv_disp_sd: float = 5.0, u_p: float = 1.0,
+        absolute: bool = False) -> Metadata:
     """Run BIRDMAn and return the inference results as ImmutableMetadata."""
    
     validate_table_and_metadata(table, metadata)
@@ -38,7 +39,8 @@ def run(table: biom.Table, metadata: Metadata, formula: str, threads: int = 16,
     metadata_df = metadata.to_dataframe()
     extra_params = {
         "beta_prior": beta_prior,
-        "inv_disp_sd": inv_disp_sd
+        "inv_disp_sd": inv_disp_sd,
+        "absolute": absolute
     }
     
     # Ensure number of threads doesn't exceed number of features
