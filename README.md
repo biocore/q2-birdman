@@ -6,10 +6,12 @@ BIRDMAn is a framework for performing differential abundance on microbiome data 
 
 `q2-birdman` requires an existing [QIIME 2](https://docs.qiime2.org) environment. Follow the [QIIME 2 installation instructions](https://docs.qiime2.org) to set one up before proceeding.
 
+> **Apple Silicon (M1/M2/M3/M4) note:** the QIIME 2 distros currently ship as `osx-64` only and run under Rosetta 2. Install Rosetta with `softwareupdate --install-rosetta --agree-to-license`, create the QIIME 2 env with `CONDA_SUBDIR=osx-64`, and `conda config --env --set subdir osx-64` after activating. Otherwise the steps below will pull `osx-arm64` wheels into an `osx-64` env and imports will fail with `incompatible architecture` errors.
+
 Once your QIIME 2 environment is active, install the BIRDMAn dependencies:
 ```bash
-mamba install -c conda-forge biom-format patsy xarray arviz cmdstanpy
-pip install birdman==0.1.0
+mamba install -c conda-forge biom-format patsy xarray arviz cmdstanpy altair seaborn
+pip install birdman==0.1.0 "setuptools<81"
 ```
 
 Then clone and install the plugin:

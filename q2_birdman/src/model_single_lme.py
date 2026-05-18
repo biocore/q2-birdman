@@ -1,10 +1,10 @@
-from pkg_resources import resource_filename
+from importlib.resources import files
 import biom
 from birdman import SingleFeatureModel
 import numpy as np
 import pandas as pd
 
-MODEL_PATH = resource_filename("q2_birdman.src", "stan/negative_binomial_lme_single.stan")
+MODEL_PATH = str(files("q2_birdman.src").joinpath("stan/negative_binomial_lme_single.stan"))
 
 class ModelSingleLME(SingleFeatureModel):
     def __init__(
