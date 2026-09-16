@@ -17,7 +17,7 @@ pip install birdman==0.1.0 "setuptools<81"
 
 Then clone and install the plugin:
 ```bash
-git clone https://github.com/lucaspatel/q2-birdman
+git clone https://github.com/biocore/q2-birdman
 cd q2-birdman
 pip install -e .
 ```
